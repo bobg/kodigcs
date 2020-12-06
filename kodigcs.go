@@ -100,11 +100,9 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 	if s.username != "" && s.password != "" {
 		username, password, ok := req.BasicAuth()
 		if !ok {
-			log.Printf("xxx BasicAuth not OK")
 			return mid.CodeErr{C: http.StatusUnauthorized}
 		}
 		if username != s.username || password != s.password {
-			log.Printf("xxx BasicAuth mismatch: username `%s` vs `%s`; password `%s` vs `%s`", username, s.username, password, s.password)
 			return mid.CodeErr{C: http.StatusUnauthorized}
 		}
 	}
@@ -118,7 +116,6 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 		return s.handleNFO(w, req, path)
 	}
 
-	log.Printf("serving %s", path)
 	s.isoRequests.Add(1)
 
 	ctx := req.Context()
@@ -135,6 +132,7 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 	// TODO: is it necessary to wrap w in order to detect an error here and propagate it out?
 
 	s.bytesRead.Add(r.nread)
+	log.Printf("served %s (%d bytes)", path, r.nread)
 
 	return nil
 }
@@ -244,14 +242,17 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 		if title, ok := row[1].(string); ok {
 			info.Title = title
 		}
-		if imdbID, ok := row[2].(string); ok {
-			info.IMDbID.Type = "imdb"
-			info.IMDbID.Val = imdbID
+		if len(row) >= 3 {
+			if imdbID, ok := row[2].(string); ok {
+				info.IMDbID.Type = "imdb"
+				info.IMDbID.Val = imdbID
+			}
 		}
 		if info == (movieInfo{}) {
 			continue
 		}
-		s.infoMap[name] = info
+		rootName := strings.TrimSuffix(name, ".iso")
+		s.infoMap[rootName] = info
 	}
 
 	s.infoMapTime = time.Now()
@@ -299,7 +300,15 @@ func (s *server) handleNFO(w http.ResponseWriter, req *http.Request, path string
 	w.Write([]byte(xml.Header))
 	enc := xml.NewEncoder(w)
 	enc.Indent("", "  ")
-	return enc.Encode(info)
+	err = enc.Encode(info)
+	if err != nil {
+		return errors.Wrap(err, "writing XML")
+	}
+
+	if imdbID := info.IMDbID.Val; imdbID != "" {
+		fmt.Fprintf(w, "\nhttps://www.imdb.com/title/%s\n", imdbID)
+	}
+	return nil
 }
 
 const dirTemplate = `
@@ -309,10 +318,12 @@ const dirTemplate = `
   <title>Index</title>
  </head>
  <body>
-	<h1>Index</h1>
+  <h1>Index</h1>
   <ul>
    {{ range . }}
-    <li><a href="{{ . }}"> {{ . }}</a></li>
+    <li>
+     <a href="{{ . }}">{{ . }}</a>
+    </li>
    {{ end }}
   </ul>
  </body>
