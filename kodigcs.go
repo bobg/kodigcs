@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/bobg/gcsobj"
 	"github.com/bobg/mid"
 	"github.com/pkg/errors"
 	"google.golang.org/api/iterator"
@@ -59,6 +60,7 @@ func main() {
 
 	http.Handle("/", mid.Err(s.handle))
 
+	log.Printf("Listening on %s", *listenAddr)
 	if *certFile != "" && *keyFile != "" {
 		err = http.ListenAndServeTLS(*listenAddr, *certFile, *keyFile, nil)
 	} else {
@@ -120,19 +122,17 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 
 	ctx := req.Context()
 	obj := s.bucket.Object(path)
-	attrs, err := obj.Attrs(ctx)
+	r, err := gcsobj.NewReader(ctx, obj)
 	if err != nil {
-		return errors.Wrapf(err, "getting attrs of %s", path)
+		return errors.Wrapf(err, "creating reader for object %s", path)
 	}
-
-	r := &objReader{obj: obj, ctx: ctx, size: attrs.Size}
 	defer r.Close()
 
 	http.ServeContent(w, req, path, time.Time{}, r)
 	// TODO: is it necessary to wrap w in order to detect an error here and propagate it out?
 
-	s.bytesRead.Add(r.nread)
-	log.Printf("served %s (%d bytes)", path, r.nread)
+	s.bytesRead.Add(r.NRead())
+	log.Printf("served %s (%d bytes)", path, r.NRead())
 
 	return nil
 }
@@ -243,7 +243,7 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 			info.Title = title
 		}
 		if len(row) >= 3 {
-			if imdbID, ok := row[2].(string); ok {
+			if imdbID, ok := row[2].(string); ok && imdbID != "" {
 				info.IMDbID.Type = "imdb"
 				info.IMDbID.Val = imdbID
 			}
@@ -268,13 +268,11 @@ func isStale(t time.Time) bool {
 type movieInfo struct {
 	XMLName xml.Name `xml:"movie"`
 	Title   string   `xml:"title,omitempty"`
-	IMDbID  imdbID   `xml:"uniqueid,omitempty"`
-}
-
-type imdbID struct {
-	XMLName xml.Name `xml:"uniqueid"`
-	Type    string   `xml:"type,attr"`
-	Val     string   `xml:",chardata"`
+	IMDbID  struct {
+		XMLName xml.Name `xml:"uniqueid"`
+		Type    string   `xml:"type,attr"`
+		Val     string   `xml:",chardata"`
+	} `xml:"uniqueid,omitempty"`
 }
 
 func (s *server) handleNFO(w http.ResponseWriter, req *http.Request, path string) error {
