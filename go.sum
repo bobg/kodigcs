@@ -37,8 +37,8 @@ cloud.google.com/go/storage v1.12.0/go.mod h1:fFLk2dp2oAhDz8QFKwqrjdJvxSp/W2g7ni
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/bobg/gcsobj v0.0.0-20201206210230-e61414c9b9c8 h1:8F11hSUkua1CG7cYDR+KdNdA+7+5EAIOUzNLUKuzbko=
-github.com/bobg/gcsobj v0.0.0-20201206210230-e61414c9b9c8/go.mod h1:vS49EQ1A1Ib8FgrL58C8xXYZyOCR2TgzAdopy6/ipa8=
+github.com/bobg/gcsobj v0.0.0-20201207042257-9af646895842 h1:1UXLvXegDs4xl23gOdweQUGjbaj1AzlZeMFRESuSpNY=
+github.com/bobg/gcsobj v0.0.0-20201207042257-9af646895842/go.mod h1:vS49EQ1A1Ib8FgrL58C8xXYZyOCR2TgzAdopy6/ipa8=
 github.com/bobg/mid v1.1.0 h1:ZBgES5uZvIVWfmqkJ4WDq67RsrUUsAw6w5bJcJRcRTs=
 github.com/bobg/mid v1.1.0/go.mod h1:yQjUtqgYcQm3gp3RFe09hBjcc2lmBkhu/2zojNCCbg4=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=

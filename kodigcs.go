@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -219,39 +220,97 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "creating sheets service")
 	}
-	resp, err := sheetsSvc.Spreadsheets.Values.Get(s.sheetID, "Sheet1!A:C").Do()
+	resp, err := sheetsSvc.Spreadsheets.Values.Get(s.sheetID, "Sheet1!A:Z").Do()
 	if err != nil {
 		return errors.Wrap(err, "reading spreadsheet data")
 	}
 	if len(resp.Values) < 2 {
 		return fmt.Errorf("got %d spreadsheet row(s), wanted 2 or more", len(resp.Values))
 	}
+
+	var headings []string
+
 	for i, row := range resp.Values {
 		if i == 0 {
-			// TODO: parse column headings
+			for _, rawheading := range row {
+				if heading, ok := rawheading.(string); ok {
+					headings = append(headings, strings.ToLower(heading))
+				} else {
+					headings = append(headings, "")
+				}
+			}
 			continue
 		}
+
 		if len(row) < 2 {
 			continue
 		}
+
 		name, ok := row[0].(string)
 		if !ok {
 			continue
 		}
+
 		var info movieInfo
-		if title, ok := row[1].(string); ok {
-			info.Title = title
-		}
-		if len(row) >= 3 {
-			if imdbID, ok := row[2].(string); ok && imdbID != "" {
-				info.IMDbID.Type = "imdb"
-				info.IMDbID.Val = imdbID
+
+		for j, rawval := range row {
+			if j == 0 {
+				continue
+			}
+			if j >= len(headings) {
+				break
+			}
+			val, ok := rawval.(string)
+			if !ok || val == "" {
+				continue
+			}
+
+			heading := headings[j]
+			switch heading {
+			case "title":
+				info.Title = val
+
+			case "year":
+				year, err := strconv.Atoi(val)
+				if err != nil {
+					log.Printf("Cannot parse year %s for %s: %s", val, name, err)
+					continue
+				}
+				info.Year = year
+
+			case "banner", "clearart", "clearlogo", "discart", "landscape", "poster":
+				info.Thumbs = append(info.Thumbs, thumb{
+					Aspect: heading,
+					Val:    val,
+				})
+
+			case "director":
+				info.Directors = append(info.Directors, val)
+
+			case "actor":
+				info.Actors = append(info.Actors, actor{
+					Name:  val,
+					Order: len(info.Actors),
+				})
+
+			case "runtime":
+				mins, err := strconv.Atoi(val)
+				if err != nil {
+					log.Printf("Cannot parse runtime %s for %s: %s", val, name, err)
+					continue
+				}
+				info.Runtime = mins
+
+			case "imdbid":
+				info.imdbID = val
 			}
 		}
-		if info == (movieInfo{}) {
-			continue
-		}
+
 		rootName := strings.TrimSuffix(name, ".iso")
+		if info.Title == "" {
+			info.Title = rootName
+		}
+
 		s.infoMap[rootName] = info
 	}
 
@@ -265,15 +324,32 @@ func isStale(t time.Time) bool {
 	return t.Before(time.Now().Add(-staleTime))
 }
 
-type movieInfo struct {
-	XMLName xml.Name `xml:"movie"`
-	Title   string   `xml:"title,omitempty"`
-	IMDbID  struct {
-		XMLName xml.Name `xml:"uniqueid"`
-		Type    string   `xml:"type,attr"`
+type (
+	movieInfo struct {
+		XMLName   xml.Name `xml:"movie"`
+		Title     string   `xml:"title,omitempty"`
+		Year      int      `xml:"year,omitempty"`
+		Thumbs    []thumb  `xml:"thumb,omitempty"`
+		Directors []string `xml:"director,omitempty"`
+		Actors    []actor  `xml:"actor,omitempty"`
+		Runtime   int      `xml:"runtime,omitempty"`
+		imdbID    string
+	}
+
+	thumb struct {
+		XMLName xml.Name `xml:"thumb"`
+		Aspect  string   `xml:"aspect,attr"`
 		Val     string   `xml:",chardata"`
-	} `xml:"uniqueid,omitempty"`
-}
+	}
+
+	actor struct {
+		XMLName xml.Name `xml:"actor"`
+		Name    string   `xml:"name"`
+		Role    string   `xml:"role,omitempty"`
+		Order   int      `xml:"order"`
+		Thumb   thumb    `xml:"thumb,omitempty"`
+	}
+)
 
 func (s *server) handleNFO(w http.ResponseWriter, req *http.Request, path string) error {
 	ctx := req.Context()
@@ -303,8 +379,8 @@ func (s *server) handleNFO(w http.ResponseWriter, req *http.Request, path string
 		return errors.Wrap(err, "writing XML")
 	}
 
-	if imdbID := info.IMDbID.Val; imdbID != "" {
-		fmt.Fprintf(w, "\nhttps://www.imdb.com/title/%s\n", imdbID)
+	if info.imdbID != "" {
+		fmt.Fprintf(w, "\nhttps://www.imdb.com/title/%s\n", info.imdbID)
 	}
 	return nil
 }
