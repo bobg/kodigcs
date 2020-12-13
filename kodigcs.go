@@ -158,16 +158,9 @@ func (s *server) handleDir(w http.ResponseWriter, req *http.Request) error {
 	defer s.mu.RUnlock()
 
 	var items []string
-	if s.infoMap == nil {
-		items = s.objNames
-	} else {
-		for _, objName := range s.objNames {
-			items = append(items, objName)
-			rootName := strings.TrimSuffix(objName, ".iso")
-			if _, ok := s.infoMap[rootName]; ok {
-				items = append(items, rootName+".nfo")
-			}
-		}
+	for _, objName := range s.objNames {
+		rootName := strings.TrimSuffix(objName, ".iso")
+		items = append(items, objName, rootName+".nfo")
 	}
 
 	return s.dirTemplate.Execute(w, items)
@@ -284,14 +277,18 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 					Val:    val,
 				})
 
-			case "director":
-				info.Directors = append(info.Directors, val)
+			case "directors":
+				directors := splitsemi(val)
+				info.Directors = append(info.Directors, directors...)
 
-			case "actor":
-				info.Actors = append(info.Actors, actor{
-					Name:  val,
-					Order: len(info.Actors),
-				})
+			case "actors":
+				actors := splitsemi(val)
+				for _, a := range actors {
+					info.Actors = append(info.Actors, actor{
+						Name:  a,
+						Order: len(info.Actors),
+					})
+				}
 
 			case "runtime":
 				mins, err := strconv.Atoi(val)
@@ -316,6 +313,19 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 
 	s.infoMapTime = time.Now()
 	return nil
+}
+
+func splitsemi(s string) []string {
+	fields := strings.Split(s, ";")
+	var result []string
+	for _, f := range fields {
+		trimmed := strings.TrimSpace(f)
+		if trimmed == "" {
+			continue
+		}
+		result = append(result, trimmed)
+	}
+	return result
 }
 
 const staleTime = 5 * time.Minute
@@ -367,7 +377,7 @@ func (s *server) handleNFO(w http.ResponseWriter, req *http.Request, path string
 	path = strings.TrimSuffix(path, ".nfo")
 	info, ok := s.infoMap[path]
 	if !ok {
-		return mid.CodeErr{C: http.StatusNotFound}
+		info = movieInfo{Title: path}
 	}
 
 	w.Header().Set("Content-Type", "application/xml")
