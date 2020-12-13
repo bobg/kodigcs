@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,7 +53,7 @@ func main() {
 		password:    *password,
 
 		dirRequests:      expvar.NewInt("dirRequests"),
-		isoRequests:      expvar.NewInt("isoRequests"),
+		mediaRequests:    expvar.NewInt("mediaRequests"),
 		nfoRequests:      expvar.NewInt("nfoRequests"),
 		bytesRead:        expvar.NewInt("bytesRead"),
 		spreadsheetLoads: expvar.NewInt("spreadsheetLoads"),
@@ -86,7 +87,7 @@ type server struct {
 	username, password string
 
 	dirRequests      *expvar.Int
-	isoRequests      *expvar.Int
+	mediaRequests    *expvar.Int
 	nfoRequests      *expvar.Int
 	bytesRead        *expvar.Int
 	spreadsheetLoads *expvar.Int
@@ -119,7 +120,7 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 		return s.handleNFO(w, req, path)
 	}
 
-	s.isoRequests.Add(1)
+	s.mediaRequests.Add(1)
 
 	ctx := req.Context()
 	obj := s.bucket.Object(path)
@@ -159,8 +160,11 @@ func (s *server) handleDir(w http.ResponseWriter, req *http.Request) error {
 
 	var items []string
 	for _, objName := range s.objNames {
-		rootName := strings.TrimSuffix(objName, ".iso")
-		items = append(items, objName, rootName+".nfo")
+		items = append(items, objName)
+		if ext := filepath.Ext(objName); ext != ".nfo" {
+			rootName := strings.TrimSuffix(objName, ext)
+			items = append(items, objName, rootName+".nfo")
+		}
 	}
 
 	return s.dirTemplate.Execute(w, items)
@@ -303,7 +307,10 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 			}
 		}
 
-		rootName := strings.TrimSuffix(name, ".iso")
+		var (
+			ext      = filepath.Ext(name)
+			rootName = strings.TrimSuffix(name, ext)
+		)
 		if info.Title == "" {
 			info.Title = rootName
 		}
