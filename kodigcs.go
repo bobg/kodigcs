@@ -163,7 +163,7 @@ func (s *server) handleDir(w http.ResponseWriter, req *http.Request) error {
 		items = append(items, objName)
 		if ext := filepath.Ext(objName); ext != ".nfo" {
 			rootName := strings.TrimSuffix(objName, ext)
-			items = append(items, objName, rootName+".nfo")
+			items = append(items, rootName+".nfo")
 		}
 	}
 
