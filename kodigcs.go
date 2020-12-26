@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/xml"
-	"expvar"
 	"flag"
 	"fmt"
 	"html/template"
@@ -33,7 +32,7 @@ func main() {
 		certFile   = flag.String("cert", "", "path to cert file")
 		keyFile    = flag.String("key", "", "path to key file")
 		username   = flag.String("username", "", "HTTP Basic Auth username")
-		password   = flag.String("password", "", "HTTP Basic Auth password")
+		password   = flag.String("password", "", "HTTP Basic Auth password") // TODO: move this to an env var so as not to reveal it via expvar
 	)
 	flag.Parse()
 
@@ -52,12 +51,12 @@ func main() {
 		username:    *username,
 		password:    *password,
 
-		dirRequests:      expvar.NewInt("dirRequests"),
-		mediaRequests:    expvar.NewInt("mediaRequests"),
-		nfoRequests:      expvar.NewInt("nfoRequests"),
-		bytesRead:        expvar.NewInt("bytesRead"),
-		spreadsheetLoads: expvar.NewInt("spreadsheetLoads"),
-		bucketLoads:      expvar.NewInt("bucketLoads"),
+		// dirRequests:      expvar.NewInt("dirRequests"),
+		// mediaRequests:    expvar.NewInt("mediaRequests"),
+		// nfoRequests:      expvar.NewInt("nfoRequests"),
+		// bytesRead:        expvar.NewInt("bytesRead"),
+		// spreadsheetLoads: expvar.NewInt("spreadsheetLoads"),
+		// bucketLoads:      expvar.NewInt("bucketLoads"),
 	}
 
 	http.Handle("/", mid.Err(s.handle))
@@ -86,12 +85,12 @@ type server struct {
 
 	username, password string
 
-	dirRequests      *expvar.Int
-	mediaRequests    *expvar.Int
-	nfoRequests      *expvar.Int
-	bytesRead        *expvar.Int
-	spreadsheetLoads *expvar.Int
-	bucketLoads      *expvar.Int
+	// dirRequests      *expvar.Int
+	// mediaRequests    *expvar.Int
+	// nfoRequests      *expvar.Int
+	// bytesRead        *expvar.Int
+	// spreadsheetLoads *expvar.Int
+	// bucketLoads      *expvar.Int
 
 	mu           sync.RWMutex // protects all of the following
 	objNames     []string
@@ -120,7 +119,7 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 		return s.handleNFO(w, req, path)
 	}
 
-	s.mediaRequests.Add(1)
+	// s.mediaRequests.Add(1)
 
 	ctx := req.Context()
 	obj := s.bucket.Object(path)
@@ -133,15 +132,14 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 	http.ServeContent(w, req, path, time.Time{}, r)
 	// TODO: is it necessary to wrap w in order to detect an error here and propagate it out?
 
-	s.bytesRead.Add(r.NRead())
-	log.Printf("served %s (%d bytes)", path, r.NRead())
+	// s.bytesRead.Add(r.NRead())
 
 	return nil
 }
 
 func (s *server) handleDir(w http.ResponseWriter, req *http.Request) error {
 	log.Print("serving directory")
-	s.dirRequests.Add(1)
+	// s.dirRequests.Add(1)
 
 	ctx := req.Context()
 
@@ -179,7 +177,7 @@ func (s *server) ensureObjNames(ctx context.Context) error {
 	}
 
 	log.Print("loading bucket")
-	s.bucketLoads.Add(1)
+	// s.bucketLoads.Add(1)
 
 	s.objNames = nil
 	iter := s.bucket.Objects(ctx, nil)
@@ -210,7 +208,7 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 	}
 
 	log.Print("loading spreadsheet")
-	s.spreadsheetLoads.Add(1)
+	// s.spreadsheetLoads.Add(1)
 
 	s.infoMap = make(map[string]movieInfo)
 	sheetsSvc, err := sheets.NewService(ctx, option.WithCredentialsFile(s.credsFile), option.WithScopes(sheets.SpreadsheetsReadonlyScope))
@@ -376,7 +374,7 @@ func (s *server) handleNFO(w http.ResponseWriter, req *http.Request, path string
 	}
 
 	log.Printf("serving %s", path)
-	s.nfoRequests.Add(1)
+	// s.nfoRequests.Add(1)
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
