@@ -112,16 +112,25 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 
 	path := strings.Trim(req.URL.Path, "/")
 	if path == "" {
-		return s.handleDir(w, req)
+		return s.handleDir(w, req, "")
 	}
 
+	ctx := req.Context()
+
+	isSubdir, err := s.isSubdir(ctx, path)
+	if err != nil {
+		return errors.Wrap(err, "checking for subdir")
+	}
+
+	if isSubdir {
+		return s.handleDir(w, req, path)
+	}
 	if strings.HasSuffix(path, ".nfo") {
 		return s.handleNFO(w, req, path)
 	}
 
 	// s.mediaRequests.Add(1)
 
-	ctx := req.Context()
 	obj := s.bucket.Object(path)
 	r, err := gcsobj.NewReader(ctx, obj)
 	if err != nil {
@@ -137,7 +146,25 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
-func (s *server) handleDir(w http.ResponseWriter, req *http.Request) error {
+func (s *server) isSubdir(ctx context.Context, path string) (bool, error) {
+	err := s.ensureInfoMap(ctx)
+	if err != nil {
+		return false, errors.Wrap(err, "getting info map")
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, info := range s.infoMap {
+		if path == info.subdir {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir string) error {
 	log.Print("serving directory")
 	// s.dirRequests.Add(1)
 
@@ -158,10 +185,28 @@ func (s *server) handleDir(w http.ResponseWriter, req *http.Request) error {
 
 	var items []string
 	for _, objName := range s.objNames {
-		items = append(items, objName)
 		if ext := filepath.Ext(objName); ext != ".nfo" {
 			rootName := strings.TrimSuffix(objName, ext)
-			items = append(items, rootName+".nfo")
+			info, ok := s.infoMap[rootName]
+			if ok && info.subdir != subdir {
+				continue
+			}
+			if !ok && subdir != "" {
+				continue
+			}
+			items = append(items, objName, rootName+".nfo")
+		}
+	}
+
+	if subdir == "" {
+		subdirs := make(map[string]bool)
+		for _, info := range s.infoMap {
+			if info.subdir != "" {
+				subdirs[info.subdir] = true
+			}
+		}
+		for s := range subdirs {
+			items = append(items, s+"/")
 		}
 	}
 
@@ -300,6 +345,9 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 				}
 				info.Runtime = mins
 
+			case "subdir":
+				info.subdir = val
+
 			case "imdbid":
 				info.imdbID = val
 			}
@@ -348,6 +396,7 @@ type (
 		Directors []string `xml:"director,omitempty"`
 		Actors    []actor  `xml:"actor,omitempty"`
 		Runtime   int      `xml:"runtime,omitempty"`
+		subdir    string
 		imdbID    string
 	}
 
