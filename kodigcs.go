@@ -117,24 +117,25 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 
 	ctx := req.Context()
 
-	isSubdir, err := s.isSubdir(ctx, path)
+	subdir, objname, err := s.parsePath(ctx, path)
 	if err != nil {
-		return errors.Wrap(err, "checking for subdir")
+		return errors.Wrapf(err, "parsing path %s", path)
 	}
 
-	if isSubdir {
-		return s.handleDir(w, req, path)
+	if objname == "" {
+		return s.handleDir(w, req, subdir)
 	}
-	if strings.HasSuffix(path, ".nfo") {
-		return s.handleNFO(w, req, path)
+
+	if strings.HasSuffix(objname, ".nfo") {
+		return s.handleNFO(w, req, objname)
 	}
 
 	// s.mediaRequests.Add(1)
 
-	obj := s.bucket.Object(path)
+	obj := s.bucket.Object(objname)
 	r, err := gcsobj.NewReader(ctx, obj)
 	if err != nil {
-		return errors.Wrapf(err, "creating reader for object %s", path)
+		return errors.Wrapf(err, "creating reader for object %s", objname)
 	}
 	defer r.Close()
 
@@ -146,26 +147,37 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
-func (s *server) isSubdir(ctx context.Context, path string) (bool, error) {
-	err := s.ensureInfoMap(ctx)
+func (s *server) parsePath(ctx context.Context, path string) (subdir, objname string, err error) {
+	err = s.ensureInfoMap(ctx)
 	if err != nil {
-		return false, errors.Wrap(err, "getting info map")
+		return "", "", err
 	}
+
+	ext := filepath.Ext(path)
+	pathRoot := strings.TrimSuffix(path, ext)
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	for _, info := range s.infoMap {
+	for rootName, info := range s.infoMap {
 		if path == info.subdir {
-			return true, nil
+			return path, "", nil
+		}
+		if pathRoot == rootName {
+			return "", path, nil
+		}
+		subdirPrefix := info.subdir + "/"
+		if pathRoot == subdirPrefix+rootName {
+			objname = strings.TrimPrefix(path, subdirPrefix)
+			return info.subdir, objname, nil
 		}
 	}
 
-	return false, nil
+	return "", path, nil
 }
 
 func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir string) error {
-	log.Print("serving directory")
+	log.Printf("serving directory \"%s\"", subdir)
 	// s.dirRequests.Add(1)
 
 	ctx := req.Context()
@@ -183,7 +195,7 @@ func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir stri
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var items []string
+	var items []template.URL
 	for _, objName := range s.objNames {
 		if ext := filepath.Ext(objName); ext != ".nfo" {
 			rootName := strings.TrimSuffix(objName, ext)
@@ -194,19 +206,19 @@ func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir stri
 			if !ok && subdir != "" {
 				continue
 			}
-			items = append(items, objName, rootName+".nfo")
+			items = append(items, template.URL(objName), template.URL(rootName+".nfo"))
 		}
 	}
 
 	if subdir == "" {
-		subdirs := make(map[string]bool)
+		subdirs := make(map[string]struct{})
 		for _, info := range s.infoMap {
 			if info.subdir != "" {
-				subdirs[info.subdir] = true
+				subdirs[info.subdir] = struct{}{}
 			}
 		}
 		for s := range subdirs {
-			items = append(items, s+"/")
+			items = append(items, template.URL(s+"/"))
 		}
 	}
 
