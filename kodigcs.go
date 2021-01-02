@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/xml"
 	"flag"
 	"fmt"
@@ -126,6 +128,8 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 		return s.handleDir(w, req, subdir)
 	}
 
+	objname = objname[8:] // remove 7-byte hash prefix plus "-"
+
 	if strings.HasSuffix(objname, ".nfo") {
 		return s.handleNFO(w, req, objname)
 	}
@@ -163,13 +167,12 @@ func (s *server) parsePath(ctx context.Context, path string) (subdir, objname st
 		if path == info.subdir {
 			return path, "", nil
 		}
-		if pathRoot == rootName {
-			return "", path, nil
+		prefix := rootNamePrefix(rootName)
+		if pathRoot == info.subdir+"/"+prefix+rootName {
+			return info.subdir, strings.TrimPrefix(path, info.subdir+"/"), nil
 		}
-		subdirPrefix := info.subdir + "/"
-		if pathRoot == subdirPrefix+rootName {
-			objname = strings.TrimPrefix(path, subdirPrefix)
-			return info.subdir, objname, nil
+		if pathRoot == prefix+rootName {
+			return "", path, nil
 		}
 	}
 
@@ -206,7 +209,14 @@ func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir stri
 			if !ok && subdir != "" {
 				continue
 			}
-			items = append(items, template.URL(objName), template.URL(rootName+".nfo"))
+
+			// We add a prefix to the entry names based on the rootname's hash.
+			// This is because Kodi doesn't seem to be able to distinguish between two different entries
+			// that are identical for the first N bytes, for some value of N.
+			// E.g., "The Best of The Electric Company, Vol. 2, Disc 1" looks the same to Kodi as
+			// "The Best of The Electric Company, Vol. 2, Disc 2".
+			prefix := rootNamePrefix(rootName)
+			items = append(items, template.URL(prefix+objName), template.URL(prefix+rootName+".nfo"))
 		}
 	}
 
@@ -223,6 +233,12 @@ func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir stri
 	}
 
 	return s.dirTemplate.Execute(w, items)
+}
+
+func rootNamePrefix(rootName string) string {
+	hash := sha256.Sum256([]byte(rootName))
+	hash64 := base64.URLEncoding.EncodeToString(hash[:])
+	return hash64[:7] + "-"
 }
 
 func (s *server) ensureObjNames(ctx context.Context) error {
