@@ -1,4 +1,4 @@
-module kodigcs
+module github.com/bobg/kodigcs
 
 go 1.14
 
