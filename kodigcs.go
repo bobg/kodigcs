@@ -104,10 +104,8 @@ type server struct {
 func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 	if s.username != "" && s.password != "" {
 		username, password, ok := req.BasicAuth()
-		if !ok {
-			return mid.CodeErr{C: http.StatusUnauthorized}
-		}
-		if username != s.username || password != s.password {
+		if !ok || username != s.username || password != s.password {
+			w.Header().Add("WWW-Authenticate", `Basic realm="Access to list and stream titles"`)
 			return mid.CodeErr{C: http.StatusUnauthorized}
 		}
 	}
