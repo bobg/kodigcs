@@ -371,6 +371,9 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 				}
 				info.Runtime = mins
 
+			case "trailer":
+				info.Trailer = val
+
 			case "subdir":
 				info.subdir = val
 
@@ -422,6 +425,7 @@ type (
 		Directors []string `xml:"director,omitempty"`
 		Actors    []actor  `xml:"actor,omitempty"`
 		Runtime   int      `xml:"runtime,omitempty"`
+		Trailer   string   `xml:"trailer,omitempty"`
 		subdir    string
 		imdbID    string
 	}
