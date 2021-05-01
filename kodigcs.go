@@ -10,6 +10,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -372,7 +373,43 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 				info.Runtime = mins
 
 			case "trailer":
-				info.Trailer = val
+				u, err := url.Parse(val)
+				if err != nil {
+					log.Printf("Cannot parse trailer URL %s for %s: %s", val, name, err)
+					continue
+				}
+
+				var ytid string
+				switch u.Host {
+				case "www.youtube.com": // /watch?v=...
+					path := strings.TrimPrefix(u.Path, "/")
+					if path != "watch" {
+						log.Printf("Cannot parse trailer URL %s for %s: not a watch link", val, name)
+						continue
+					}
+					qvals, err := url.ParseQuery(u.RawQuery)
+					if err != nil {
+						log.Printf("Cannot parse query in trailer URL %s for %s: %s", val, name, err)
+						continue
+					}
+					if v, ok := qvals["v"]; ok && len(v) > 0 {
+						ytid = v[0]
+					}
+
+				case "youtu.be": // /...
+					ytid = strings.TrimPrefix(u.Path, "/")
+
+				default:
+					log.Printf("Cannot parse trailer URL %s for %s: not a YouTube link", val, name)
+					continue
+				}
+
+				if ytid == "" {
+					log.Printf("Cannot parse YouTube ID out of trailer URL %s for %s", val, name)
+					continue
+				}
+
+				info.Trailer = fmt.Sprintf("plugin://plugin.video.youtube/?action=play_video&videoid=%s", ytid)
 
 			case "subdir":
 				info.subdir = val
