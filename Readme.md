@@ -93,6 +93,11 @@ Remaining columns may have these headings:
 - `Directors`: this is a semicolon-separated list of directors for the title.
 - `Actors`: this is a semicolon-separated list of actors for the title.
 - `Runtime`: this is the running time, in minutes, of the title.
+- `Trailer`: this is a YouTube URL of a trailer for the title.
+- `Poster`: this is the URL of poster art for the title.
+- `Tagline`: this is a short line of text, the title’s tag line.
+- `Outline`: this is a short line of text, a summary of the title.
+- `Plot`: this is a longer description of the title’s plot.
 
 You must make your spreadsheet readable to at least the “service account” whose credentials kodigcs is using (with `-creds`).
 You must specify the ID of the spreadsheet to kodigcs with `-sheet`.
