@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/xml"
 	"flag"
 	"fmt"
@@ -13,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -26,8 +24,6 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
 )
-
-var imdbRE = regexp.MustCompile(`^https?://(?:www\.)?imdb\.com/title/([[:alnum:]]+)`)
 
 func main() {
 	var (
@@ -152,36 +148,6 @@ func (s *server) ensureObjNames(ctx context.Context) error {
 
 	s.objNamesTime = time.Now()
 	return nil
-}
-
-func parsePersons(inp []byte) ([]string, error) {
-	if len(inp) == 0 {
-		return nil, nil
-	}
-
-	type person struct {
-		Name string `json:"name"`
-	}
-
-	var (
-		p  person
-		ps []person
-	)
-	err := json.Unmarshal(inp, &p)
-	if err != nil {
-		err = json.Unmarshal(inp, &ps)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse %s", string(inp))
-		}
-	} else {
-		ps = []person{p}
-	}
-
-	names := make([]string, 0, len(ps))
-	for _, p := range ps {
-		names = append(names, p.Name)
-	}
-	return names, nil
 }
 
 func (s *server) ensureInfoMap(ctx context.Context) error {
@@ -314,11 +280,7 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 				info.subdir = val
 
 			case "imdbid":
-				if m := imdbRE.FindStringSubmatch(val); len(m) > 1 {
-					info.imdbID = m[1]
-				} else {
-					info.imdbID = val
-				}
+				info.imdbID = parseIMDbID(val)
 			}
 		}
 
