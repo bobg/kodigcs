@@ -7,6 +7,7 @@ require (
 	github.com/bobg/gcsobj v0.0.0-20210103170834-62968b365dc7
 	github.com/bobg/htree v1.2.1
 	github.com/bobg/mid v1.2.3
+	github.com/bobg/subcmd v0.0.0-20210213180814-0c84b241b4b3 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/pkg/errors v0.9.1
 	golang.org/x/mod v0.4.2 // indirect

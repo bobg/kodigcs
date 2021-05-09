@@ -51,20 +51,38 @@ func handleSheet(sheetsSvc *sheets.SpreadsheetsService, sheetID string, f func(r
 	return nil
 }
 
-func (s *server) updateSpreadsheet(ctx context.Context) error {
-	svc, err := sheets.NewService(ctx, option.WithCredentialsFile(s.credsFile), option.WithScopes(sheets.SpreadsheetsScope))
+func updateSpreadsheet(ctx context.Context, credsFile, sheetID string) error {
+	svc, err := sheets.NewService(ctx, option.WithCredentialsFile(credsFile), option.WithScopes(sheets.SpreadsheetsScope))
 	if err != nil {
 		return errors.Wrap(err, "creating sheets service")
 	}
 
+	var (
+		httpLimiter = rate.NewLimiter(rate.Every(time.Second), 1)
+		ssLimiter   = rate.NewLimiter(rate.Every(time.Second), 1)
+	)
+
 	cl := &http.Client{
 		Transport: &limitedTransport{
-			limiter:   rate.NewLimiter(rate.Every(time.Second), 1),
+			limiter:   httpLimiter,
 			transport: http.DefaultTransport,
 		},
 	}
 
-	return handleSheet(svc.Spreadsheets, s.sheetID, func(rownum int, headings []string, name string, row []interface{}) error {
+	ssSet := func(cell, val string) error {
+		err := ssLimiter.Wait(ctx)
+		if err != nil {
+			return errors.Wrap(err, "waiting for ssLimiter")
+		}
+		vr := &sheets.ValueRange{
+			Range:  cell,
+			Values: [][]interface{}{{val}},
+		}
+		_, err = svc.Spreadsheets.Values.Update(sheetID, cell, vr).Context(ctx).ValueInputOption("RAW").Do()
+		return errors.Wrap(err, "updating cell %s in spreadsheet")
+	}
+
+	return handleSheet(svc.Spreadsheets, sheetID, func(rownum int, headings []string, name string, row []interface{}) error {
 		var (
 			id         string
 			needLookup bool
@@ -137,27 +155,27 @@ func (s *server) updateSpreadsheet(ctx context.Context) error {
 			switch heading {
 			case "actors":
 				newval := strings.Join(imdbInfo.Actors, "; ")
-				err = s.ssSet(ctx, svc.Spreadsheets, cell, newval)
+				err = ssSet(cell, newval)
 				if err != nil {
 					return errors.Wrapf(err, "setting %s to %s", cell, newval)
 				}
 
 			case "directors":
 				newval := strings.Join(imdbInfo.Directors, "; ")
-				err = s.ssSet(ctx, svc.Spreadsheets, cell, newval)
+				err = ssSet(cell, newval)
 				if err != nil {
 					return errors.Wrapf(err, "setting %s to %s", cell, newval)
 				}
 
 			case "genre":
 				newval := strings.Join(imdbInfo.Genres, "; ")
-				err = s.ssSet(ctx, svc.Spreadsheets, cell, newval)
+				err = ssSet(cell, newval)
 				if err != nil {
 					return errors.Wrapf(err, "setting %s to %s", cell, newval)
 				}
 
 			case "poster":
-				err = s.ssSet(ctx, svc.Spreadsheets, cell, imdbInfo.Image)
+				err = ssSet(cell, imdbInfo.Image)
 				if err != nil {
 					return errors.Wrapf(err, "setting %s to %s", cell, imdbInfo.Image)
 				}
@@ -167,7 +185,7 @@ func (s *server) updateSpreadsheet(ctx context.Context) error {
 				if len(parts) != 3 {
 					continue
 				}
-				err = s.ssSet(ctx, svc.Spreadsheets, cell, parts[0])
+				err = ssSet(cell, parts[0])
 				if err != nil {
 					return errors.Wrapf(err, "setting %s to %s", cell, parts[0])
 				}
@@ -176,19 +194,6 @@ func (s *server) updateSpreadsheet(ctx context.Context) error {
 
 		return nil
 	})
-}
-
-func (s *server) ssSet(ctx context.Context, sheetsSvc *sheets.SpreadsheetsService, cell, val string) error {
-	err := s.limiter.Wait(ctx)
-	if err != nil {
-		return err
-	}
-	vr := &sheets.ValueRange{
-		Range:  cell,
-		Values: [][]interface{}{{val}},
-	}
-	_, err = sheetsSvc.Values.Update(s.sheetID, cell, vr).Context(ctx).ValueInputOption("RAW").Do()
-	return err
 }
 
 // Row and col are both zero-based.

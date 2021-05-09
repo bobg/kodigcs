@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"golang.org/x/time/rate"
 )
 
 type server struct {
@@ -19,8 +18,7 @@ type server struct {
 
 	username, password string
 
-	imdb    bool
-	limiter *rate.Limiter // for use in ssSet
+	imdb bool
 
 	// dirRequests      *expvar.Int
 	// mediaRequests    *expvar.Int
