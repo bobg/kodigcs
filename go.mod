@@ -4,7 +4,6 @@ go 1.14
 
 require (
 	cloud.google.com/go/storage v1.15.0
-	github.com/bobg/basexx v0.0.0-20191130163404-b0c4bda224a5
 	github.com/bobg/gcsobj v0.0.0-20210103170834-62968b365dc7
 	github.com/bobg/htree v1.2.1
 	github.com/bobg/mid v1.2.3
