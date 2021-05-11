@@ -34,20 +34,49 @@ Run:
 go get github.com/bobg/kodigcs
 ```
 
-## Running kodigcs
+## Running kodigcs in server mode
 
 ```sh
-kodigcs -bucket BUCKETNAME [-creds CREDS] [-sheet SHEET_ID] [-listen ADDR] [-cert CERT] [-key KEY] [-username USERNAME] [-password PASSWORD]
+kodigcs [-creds CREDS] serve -bucket BUCKETNAME [-sheet SHEET_ID] [-listen ADDR] [-cert CERT] [-key KEY] [-username USERNAME] [-password PASSWORD]
 ```
 
-- BUCKETNAME is the name of the GCS bucket
-- CREDS is the name of the JSON file containing credentials for accessing the bucket (default is `creds.json`)
+- CREDS is the name of the JSON file containing credentials for accessing the bucket (default is `creds.json`). Note that it precedes the `serve` subcommand.
+- BUCKETNAME is the name of the GCS bucket and is required
 - SHEET_ID is the Google Drive spreadsheet ID of the metadata spreadsheet (see below)
 - ADDR is the address on which the server will listen for requests (default `:1549`)
 - CERT is the name of the TLS certificate file, if operating in TLS (i.e., HTTPS) mode
 - KEY is the name of the TLS private key file, if operating in TLS (i.e., HTTPS) mode
 - USERNAME is a username string that requests must supply, if using HTTP “basic authentication”
 - PASSWORD is a password string that requests must supply, if using HTTP “basic authentication”
+
+## Running kodigcs to update a metadata spreadsheet
+
+```sh
+kodigcs [-creds CREDS] ssupdate -sheet SHEET_ID
+```
+
+`CREDS` and `SHEET_ID` are as described above.
+
+In this mode, kodigcs will inspect each row of the given spreadsheet,
+looking for values in an `IMDbID` column.
+These are the keys that the Internet Movie Database uses for each title.
+For example,
+the main info page for _The Matrix_ is https://www.imdb.com/title/tt0133093/,
+so the IMDb key is tt0133093.
+(Either value works in the `IMDbID` column:
+the full URL or just the IMDb key.)
+
+If a metadata spreadsheet has an `IMDbID` column,
+and a row has a value in it,
+and that same row is missing some other detail,
+such as release year, directors, actors, etc.,
+then ssupdate will scrape the IMDb for that info
+and add it to the spreadsheet.
+
+For this to work,
+the spreadsheet must be writable by the “service account” associated with the supplied credentials.
+
+For more about the metadata spreadsheet see “The metadata spreadsheet” below.
 
 ## Adding your kodigcs source to Kodi
 
@@ -88,11 +117,18 @@ Each value in this column is the name of an object in your GCS bucket.
 Remaining columns may have these headings:
 
 - `Title`: this is the title that will be shown for the object. (The default is to infer the title from `Filename`.)
-- `Subdir`: related objects may be grouped in a synthesized subdirectory by giving them identical `Subdir` names. This feature is of limited usefulness, as the Kodi user interface does not present these groupings, and it may change in future versions.
 - `Year`: this is the release year for the title.
 - `Directors`: this is a semicolon-separated list of directors for the title.
 - `Actors`: this is a semicolon-separated list of actors for the title.
 - `Runtime`: this is the running time, in minutes, of the title.
+- `Trailer`: this is a YouTube URL of a trailer for the title.
+- `Poster`: this is the URL of poster art for the title.
+- `Tagline`: this is a short line of text, the title’s tag line.
+- `Outline`: this is a short line of text, a summary of the title.
+- `Plot`: this is a longer description of the title’s plot.
+- `Genre`: this is the title’s genre.
+- `Subdir`: related objects may be grouped in a synthesized subdirectory by giving them identical `Subdir` names. This feature is of limited usefulness, as the Kodi user interface does not present these groupings, and it may change in future versions.
+- `IMDbID`: this is the Internet Movie Database’s ID for the title.
 
 You must make your spreadsheet readable to at least the “service account” whose credentials kodigcs is using (with `-creds`).
 You must specify the ID of the spreadsheet to kodigcs with `-sheet`.
