@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/bobg/htree"
@@ -14,7 +16,10 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
-var imdbRE = regexp.MustCompile(`^https?://(?:www\.)?imdb\.com/title/([[:alnum:]]+)`)
+var (
+	imdbRE    = regexp.MustCompile(`^https?://(?:www\.)?imdb\.com/title/([[:alnum:]]+)`)
+	runtimeRE = regexp.MustCompile(`^PT(\d+)M$`)
+)
 
 func parseIMDbID(inp string) string {
 	if m := imdbRE.FindStringSubmatch(inp); len(m) > 1 {
@@ -37,7 +42,8 @@ type imdbInfo struct {
 	Actors    []string `json:"-"`
 	Directors []string `json:"-"`
 
-	Summary string `json:"-"`
+	RuntimeMins int    `json:"-"`
+	Summary     string `json:"-"`
 }
 
 func parseIMDbPage(cl *http.Client, id string) (*imdbInfo, error) {
@@ -112,6 +118,21 @@ func parseIMDbPage(cl *http.Client, id string) (*imdbInfo, error) {
 			return nil, errors.Wrapf(err, "getting summary text for %s", titleURL)
 		}
 		result.Summary = strings.TrimSpace(summary)
+	}
+
+	runtimeEl := htree.FindEl(doc, func(n *html.Node) bool {
+		return n.DataAtom == atom.Time
+	})
+	if runtimeEl != nil {
+		attr := htree.ElAttr(runtimeEl, "datetime")
+		if m := runtimeRE.FindStringSubmatch(attr); len(m) > 0 {
+			runtime, err := strconv.Atoi(m[1])
+			if err != nil {
+				log.Printf("Warning: cannot parse runtime string %s", attr)
+			} else {
+				result.RuntimeMins = runtime
+			}
+		}
 	}
 
 	return &result, nil

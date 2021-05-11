@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -107,7 +108,7 @@ func updateSpreadsheet(ctx context.Context, credsFile, sheetID string) error {
 
 		for j, heading := range headings {
 			switch heading {
-			case "actors", "directors", "genre", "poster", "year", "plot":
+			case "actors", "directors", "genre", "poster", "year", "plot", "runtime":
 				if j >= len(row) {
 					needLookup = true
 				} else {
@@ -194,6 +195,14 @@ func updateSpreadsheet(ctx context.Context, credsFile, sheetID string) error {
 				err = ssSet(cell, info.Summary)
 				if err != nil {
 					return errors.Wrapf(err, "setting %s to plot summary", cell)
+				}
+
+			case "runtime":
+				if info.RuntimeMins > 0 {
+					err = ssSet(cell, strconv.Itoa(info.RuntimeMins))
+					if err != nil {
+						return errors.Wrapf(err, "setting %s to runtime of %d", cell, info.RuntimeMins)
+					}
 				}
 			}
 		}
