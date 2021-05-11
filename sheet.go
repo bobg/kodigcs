@@ -107,7 +107,7 @@ func updateSpreadsheet(ctx context.Context, credsFile, sheetID string) error {
 
 		for j, heading := range headings {
 			switch heading {
-			case "actors", "directors", "genre", "poster", "year":
+			case "actors", "directors", "genre", "poster", "year", "plot":
 				if j >= len(row) {
 					needLookup = true
 				} else {
@@ -128,7 +128,7 @@ func updateSpreadsheet(ctx context.Context, credsFile, sheetID string) error {
 			return nil
 		}
 
-		imdbInfo, err := parseIMDbPage(cl, id)
+		info, err := parseIMDbPage(cl, id)
 		if err != nil {
 			return errors.Wrapf(err, "getting IMDb info for %s (id %s)", name, id)
 		}
@@ -154,40 +154,46 @@ func updateSpreadsheet(ctx context.Context, credsFile, sheetID string) error {
 
 			switch heading {
 			case "actors":
-				newval := strings.Join(imdbInfo.Actors, "; ")
+				newval := strings.Join(info.Actors, "; ")
 				err = ssSet(cell, newval)
 				if err != nil {
 					return errors.Wrapf(err, "setting %s to %s", cell, newval)
 				}
 
 			case "directors":
-				newval := strings.Join(imdbInfo.Directors, "; ")
+				newval := strings.Join(info.Directors, "; ")
 				err = ssSet(cell, newval)
 				if err != nil {
 					return errors.Wrapf(err, "setting %s to %s", cell, newval)
 				}
 
 			case "genre":
-				newval := strings.Join(imdbInfo.Genres, "; ")
+				newval := strings.Join(info.Genres, "; ")
 				err = ssSet(cell, newval)
 				if err != nil {
 					return errors.Wrapf(err, "setting %s to %s", cell, newval)
 				}
 
 			case "poster":
-				err = ssSet(cell, imdbInfo.Image)
+				err = ssSet(cell, info.Image)
 				if err != nil {
-					return errors.Wrapf(err, "setting %s to %s", cell, imdbInfo.Image)
+					return errors.Wrapf(err, "setting %s to %s", cell, info.Image)
 				}
 
 			case "year":
-				parts := strings.Split(imdbInfo.DatePublished, "-")
+				parts := strings.Split(info.DatePublished, "-")
 				if len(parts) != 3 {
 					continue
 				}
 				err = ssSet(cell, parts[0])
 				if err != nil {
 					return errors.Wrapf(err, "setting %s to %s", cell, parts[0])
+				}
+
+			case "plot":
+				err = ssSet(cell, info.Summary)
+				if err != nil {
+					return errors.Wrapf(err, "setting %s to plot summary", cell)
 				}
 			}
 		}

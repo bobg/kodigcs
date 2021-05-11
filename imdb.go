@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/bobg/htree"
 	"github.com/pkg/errors"
@@ -22,7 +23,7 @@ func parseIMDbID(inp string) string {
 	return inp
 }
 
-type imdbJSONLD struct {
+type imdbInfo struct {
 	Name          string          `json:"name"`
 	Image         string          `json:"image"`
 	RawGenre      json.RawMessage `json:"genre"`    // string or []string
@@ -35,9 +36,11 @@ type imdbJSONLD struct {
 	Genres    []string `json:"-"`
 	Actors    []string `json:"-"`
 	Directors []string `json:"-"`
+
+	Summary string `json:"-"`
 }
 
-func parseIMDbPage(cl *http.Client, id string) (*imdbJSONLD, error) {
+func parseIMDbPage(cl *http.Client, id string) (*imdbInfo, error) {
 	titleURL := fmt.Sprintf("https://www.imdb.com/title/%s/", id)
 
 	req, err := http.NewRequest("GET", titleURL, nil)
@@ -74,7 +77,7 @@ func parseIMDbPage(cl *http.Client, id string) (*imdbJSONLD, error) {
 		jsonBuf.WriteString(child.Data)
 	}
 
-	var result imdbJSONLD
+	var result imdbInfo
 	err = json.Unmarshal(jsonBuf.Bytes(), &result)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unmarshaling JSON in response from %s", titleURL)
@@ -98,6 +101,17 @@ func parseIMDbPage(cl *http.Client, id string) (*imdbJSONLD, error) {
 		}
 	} else {
 		result.Genres = []string{genre}
+	}
+
+	summaryEl := htree.FindEl(doc, func(n *html.Node) bool {
+		return n.DataAtom == atom.Div && htree.ElClassContains(n, "summary_text")
+	})
+	if summaryEl != nil {
+		summary, err := htree.Text(summaryEl)
+		if err != nil {
+			return nil, errors.Wrapf(err, "getting summary text for %s", titleURL)
+		}
+		result.Summary = strings.TrimSpace(summary)
 	}
 
 	return &result, nil
