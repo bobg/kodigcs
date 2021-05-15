@@ -18,14 +18,7 @@ type server struct {
 
 	username, password string
 
-	imdb bool
-
-	// dirRequests      *expvar.Int
-	// mediaRequests    *expvar.Int
-	// nfoRequests      *expvar.Int
-	// bytesRead        *expvar.Int
-	// spreadsheetLoads *expvar.Int
-	// bucketLoads      *expvar.Int
+	verbose bool
 
 	mu           sync.RWMutex // protects all of the following
 	objNames     []string

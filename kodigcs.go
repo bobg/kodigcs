@@ -43,7 +43,7 @@ func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 			"key", subcmd.String, "", "path to key file",
 			"username", subcmd.String, "", "HTTP Basic Auth username",
 			"password", subcmd.String, "", "HTTP Basic Auth password", // TODO: move this to an env var so as not to reveal it via expvar
-			"imdb", subcmd.Bool, false, "lookup titles by their IMDb ID and fill in missing spreadsheet fields",
+			"verbose", subcmd.Bool, false, "log each chunk of content as it's served",
 		),
 		"ssupdate", c.ssupdate, subcmd.Params(
 			"sheet", subcmd.String, "", "ID of Google spreadsheet with title metadata",
@@ -51,7 +51,7 @@ func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 	)
 }
 
-func (c maincmd) serve(ctx context.Context, bucketName, sheetID, listenAddr, certFile, keyFile, username, password string, imdb bool, _ []string) error {
+func (c maincmd) serve(ctx context.Context, bucketName, sheetID, listenAddr, certFile, keyFile, username, password string, verbose bool, _ []string) error {
 	client, err := storage.NewClient(ctx, option.WithCredentialsFile(c.credsFile))
 	if err != nil {
 		log.Fatal(err)
@@ -64,21 +64,7 @@ func (c maincmd) serve(ctx context.Context, bucketName, sheetID, listenAddr, cer
 		dirTemplate: template.Must(template.New("").Parse(dirTemplate)),
 		username:    username,
 		password:    password,
-
-		// dirRequests:      expvar.NewInt("dirRequests"),
-		// mediaRequests:    expvar.NewInt("mediaRequests"),
-		// nfoRequests:      expvar.NewInt("nfoRequests"),
-		// bytesRead:        expvar.NewInt("bytesRead"),
-		// spreadsheetLoads: expvar.NewInt("spreadsheetLoads"),
-		// bucketLoads:      expvar.NewInt("bucketLoads"),
-	}
-
-	if imdb {
-		log.Print("Updating spreadsheet")
-		err = updateSpreadsheet(ctx, c.credsFile, sheetID)
-		if err != nil {
-			log.Fatal(err)
-		}
+		verbose:     verbose,
 	}
 
 	http.Handle("/", mid.Err(s.handle))

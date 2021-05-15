@@ -22,6 +22,8 @@ import (
 )
 
 func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
+	start := time.Now()
+
 	if s.username != "" && s.password != "" {
 		username, password, ok := req.BasicAuth()
 		if !ok || username != s.username || password != s.password {
@@ -52,8 +54,6 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 		return s.handleNFO(w, req, objname)
 	}
 
-	// s.mediaRequests.Add(1)
-
 	obj := s.bucket.Object(objname)
 	r, err := gcsobj.NewReader(ctx, obj)
 	if err != nil {
@@ -64,14 +64,15 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 	http.ServeContent(w, req, path, time.Time{}, r)
 	// TODO: is it necessary to wrap w in order to detect an error here and propagate it out?
 
-	// s.bytesRead.Add(r.NRead())
+	if s.verbose {
+		log.Printf("%s: %d bytes [%s]", objname, r.NRead(), time.Since(start))
+	}
 
 	return nil
 }
 
 func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir string) error {
 	log.Printf("serving directory \"%s\"", subdir)
-	// s.dirRequests.Add(1)
 
 	ctx := req.Context()
 
@@ -133,7 +134,6 @@ func (s *server) handleNFO(w http.ResponseWriter, req *http.Request, path string
 	}
 
 	log.Printf("serving %s", path)
-	// s.nfoRequests.Add(1)
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -196,7 +196,6 @@ func (s *server) ensureObjNames(ctx context.Context) error {
 	}
 
 	log.Print("loading bucket")
-	// s.bucketLoads.Add(1)
 
 	s.objNames = nil
 	iter := s.bucket.Objects(ctx, nil)
@@ -227,7 +226,6 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 	}
 
 	log.Print("loading spreadsheet")
-	// s.spreadsheetLoads.Add(1)
 
 	s.infoMap = make(map[string]movieInfo)
 	svc, err := sheets.NewService(ctx, option.WithCredentialsFile(s.credsFile), option.WithScopes(sheets.SpreadsheetsReadonlyScope))
