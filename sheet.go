@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -59,7 +60,7 @@ func updateSpreadsheet(ctx context.Context, credsFile, sheetID string) error {
 	}
 
 	var (
-		httpLimiter = rate.NewLimiter(rate.Every(time.Second), 1)
+		httpLimiter = rate.NewLimiter(rate.Every(10*time.Second), 1)
 		ssLimiter   = rate.NewLimiter(rate.Every(time.Second), 1)
 	)
 
@@ -128,6 +129,8 @@ func updateSpreadsheet(ctx context.Context, credsFile, sheetID string) error {
 		if !needLookup {
 			return nil
 		}
+
+		log.Printf("Getting IMDb info for %s...", name)
 
 		info, err := parseIMDbPage(cl, id)
 		if err != nil {

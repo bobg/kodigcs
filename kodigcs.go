@@ -95,6 +95,7 @@ type (
 	movieInfo struct {
 		XMLName   xml.Name `xml:"movie"`
 		Title     string   `xml:"title,omitempty"`
+		SortTitle string   `xml:"sorttitle,omitempty"`
 		Year      int      `xml:"year,omitempty"`
 		Thumbs    []thumb  `xml:"thumb,omitempty"`
 		Directors []string `xml:"director,omitempty"`

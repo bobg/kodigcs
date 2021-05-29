@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -17,8 +16,9 @@ import (
 )
 
 var (
-	imdbRE    = regexp.MustCompile(`^https?://(?:www\.)?imdb\.com/title/([[:alnum:]]+)`)
-	runtimeRE = regexp.MustCompile(`^PT(\d+)M$`)
+	imdbRE     = regexp.MustCompile(`^https?://(?:www\.)?imdb\.com/title/([[:alnum:]]+)`)
+	runtimeRE1 = regexp.MustCompile(`^PT(\d+)M$`)
+	runtimeRE2 = regexp.MustCompile(`(\d+)h\s+(\d+)m`)
 )
 
 func parseIMDbID(inp string) string {
@@ -59,6 +59,10 @@ func parseIMDbPage(cl *http.Client, id string) (*imdbInfo, error) {
 		return nil, errors.Wrapf(err, "getting %s", titleURL)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("status %d (%s) getting %s", resp.StatusCode, http.StatusText(resp.StatusCode), titleURL)
+	}
 
 	doc, err := html.Parse(resp.Body)
 	if err != nil {
@@ -109,33 +113,83 @@ func parseIMDbPage(cl *http.Client, id string) (*imdbInfo, error) {
 		result.Genres = []string{genre}
 	}
 
+	summary, err := getSummary(doc)
+	if err != nil {
+		return nil, errors.Wrapf(err, "getting summary text for %s", titleURL)
+	}
+	result.Summary = strings.TrimSpace(summary)
+
+	runtimeMins, err := getRuntimeMins(doc)
+	if err != nil {
+		return nil, errors.Wrapf(err, "getting runtime for %s", titleURL)
+	}
+	if runtimeMins > 0 {
+		result.RuntimeMins = runtimeMins
+	}
+
+	return &result, nil
+}
+
+func getSummary(doc *html.Node) (string, error) {
 	summaryEl := htree.FindEl(doc, func(n *html.Node) bool {
 		return n.DataAtom == atom.Div && htree.ElClassContains(n, "summary_text")
 	})
 	if summaryEl != nil {
-		summary, err := htree.Text(summaryEl)
-		if err != nil {
-			return nil, errors.Wrapf(err, "getting summary text for %s", titleURL)
-		}
-		result.Summary = strings.TrimSpace(summary)
+		return htree.Text(summaryEl)
 	}
 
+	summaryEl = htree.FindEl(doc, func(n *html.Node) bool {
+		return n.DataAtom == atom.Div && htree.ElAttr(n, "data-testid") == "storyline-plot-summary"
+	})
+	if summaryEl != nil {
+		return htree.Text(summaryEl)
+	}
+
+	return "", nil
+}
+
+func getRuntimeMins(doc *html.Node) (int, error) {
 	runtimeEl := htree.FindEl(doc, func(n *html.Node) bool {
 		return n.DataAtom == atom.Time
 	})
 	if runtimeEl != nil {
 		attr := htree.ElAttr(runtimeEl, "datetime")
-		if m := runtimeRE.FindStringSubmatch(attr); len(m) > 0 {
+		if m := runtimeRE1.FindStringSubmatch(attr); len(m) > 0 {
 			runtime, err := strconv.Atoi(m[1])
-			if err != nil {
-				log.Printf("Warning: cannot parse runtime string %s", attr)
-			} else {
-				result.RuntimeMins = runtime
+			if err == nil {
+				// Ignore errors.
+				return runtime, nil
 			}
 		}
 	}
 
-	return &result, nil
+	runtimeEl = htree.FindEl(doc, func(n *html.Node) bool {
+		return n.DataAtom == atom.Li && htree.ElAttr(n, "data-testid") == "title-techspec_runtime"
+	})
+	if runtimeEl != nil {
+		subEl := htree.FindEl(doc, func(n *html.Node) bool {
+			return n.DataAtom == atom.Span && htree.ElClassContains(n, "ipc-metadata-list-item__list-content-item")
+		})
+		if subEl != nil {
+			text, err := htree.Text(subEl)
+			if err != nil {
+				return 0, errors.Wrap(err, "getting runtime text")
+			}
+			if m := runtimeRE2.FindStringSubmatch(text); len(m) > 0 {
+				hrs, err := strconv.Atoi(m[1])
+				if err != nil {
+					return 0, errors.Wrapf(err, "parsing runtime %s", text)
+				}
+				mins, err := strconv.Atoi(m[2])
+				if err != nil {
+					return 0, errors.Wrapf(err, "parsing runtime %s", text)
+				}
+				return 60*hrs + mins, nil
+			}
+		}
+	}
+
+	return 0, nil
 }
 
 func parsePersons(inp []byte) ([]string, error) {

@@ -253,6 +253,9 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 			case "title":
 				info.Title = val
 
+			case "sort":
+				info.SortTitle = val
+
 			case "year":
 				year, err := strconv.Atoi(val)
 				if err != nil {
