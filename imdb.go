@@ -167,7 +167,7 @@ func getRuntimeMins(doc *html.Node) (int, error) {
 		return n.DataAtom == atom.Li && htree.ElAttr(n, "data-testid") == "title-techspec_runtime"
 	})
 	if runtimeEl != nil {
-		subEl := htree.FindEl(doc, func(n *html.Node) bool {
+		subEl := htree.FindEl(runtimeEl, func(n *html.Node) bool {
 			return n.DataAtom == atom.Span && htree.ElClassContains(n, "ipc-metadata-list-item__list-content-item")
 		})
 		if subEl != nil {
