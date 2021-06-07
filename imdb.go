@@ -19,6 +19,7 @@ var (
 	imdbRE     = regexp.MustCompile(`^https?://(?:www\.)?imdb\.com/title/([[:alnum:]]+)`)
 	runtimeRE1 = regexp.MustCompile(`^PT(\d+)M$`)
 	runtimeRE2 = regexp.MustCompile(`(\d+)h\s+(\d+)m`)
+	runtimeRE3 = regexp.MustCompile(`(\d+)min`)
 )
 
 func parseIMDbID(inp string) string {
@@ -185,6 +186,9 @@ func getRuntimeMins(doc *html.Node) (int, error) {
 					return 0, errors.Wrapf(err, "parsing runtime %s", text)
 				}
 				return 60*hrs + mins, nil
+			}
+			if m := runtimeRE3.FindStringSubmatch(text); len(m) > 0 {
+				return strconv.Atoi(m[1])
 			}
 		}
 	}
