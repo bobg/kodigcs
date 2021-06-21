@@ -43,6 +43,7 @@ func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 			"key", subcmd.String, "", "path to key file",
 			"username", subcmd.String, "", "HTTP Basic Auth username",
 			"password", subcmd.String, "", "HTTP Basic Auth password", // TODO: move this to an env var so as not to reveal it via expvar
+			"subdirs", subcmd.Bool, true, "whether to serve subdirectories",
 			"verbose", subcmd.Bool, false, "log each chunk of content as it's served",
 		),
 		"ssupdate", c.ssupdate, subcmd.Params(
@@ -51,7 +52,7 @@ func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 	)
 }
 
-func (c maincmd) serve(ctx context.Context, bucketName, sheetID, listenAddr, certFile, keyFile, username, password string, verbose bool, _ []string) error {
+func (c maincmd) serve(ctx context.Context, bucketName, sheetID, listenAddr, certFile, keyFile, username, password string, subdirs, verbose bool, _ []string) error {
 	client, err := storage.NewClient(ctx, option.WithCredentialsFile(c.credsFile))
 	if err != nil {
 		log.Fatal(err)
@@ -64,6 +65,7 @@ func (c maincmd) serve(ctx context.Context, bucketName, sheetID, listenAddr, cer
 		dirTemplate: template.Must(template.New("").Parse(dirTemplate)),
 		username:    username,
 		password:    password,
+		subdirs:     subdirs,
 		verbose:     verbose,
 	}
 

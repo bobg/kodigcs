@@ -18,6 +18,7 @@ type server struct {
 
 	username, password string
 
+	subdirs bool
 	verbose bool
 
 	mu           sync.RWMutex // protects all of the following

@@ -72,6 +72,10 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 }
 
 func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir string) error {
+	if !s.subdirs && subdir != "" {
+		return fmt.Errorf("will not serve subdir \"%s\" in non-subdirs mode", subdir)
+	}
+
 	log.Printf("serving directory \"%s\"", subdir)
 
 	ctx := req.Context()
@@ -94,10 +98,10 @@ func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir stri
 		if ext := filepath.Ext(objName); ext != ".nfo" {
 			rootName := strings.TrimSuffix(objName, ext)
 			info, ok := s.infoMap[rootName]
-			if ok && info.subdir != subdir {
+			if ok && s.subdirs && info.subdir != subdir {
 				continue
 			}
-			if !ok && subdir != "" {
+			if !ok && s.subdirs && subdir != "" {
 				continue
 			}
 
@@ -111,15 +115,15 @@ func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir stri
 		}
 	}
 
-	if subdir == "" {
+	if s.subdirs && subdir == "" {
 		subdirs := make(map[string]struct{})
 		for _, info := range s.infoMap {
 			if info.subdir != "" {
 				subdirs[info.subdir] = struct{}{}
 			}
 		}
-		for s := range subdirs {
-			items = append(items, template.URL(s+"/"))
+		for sd := range subdirs {
+			items = append(items, template.URL(sd+"/"))
 		}
 	}
 
