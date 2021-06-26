@@ -5,7 +5,7 @@ go 1.14
 require (
 	cloud.google.com/go v0.82.0 // indirect
 	cloud.google.com/go/storage v1.15.0
-	github.com/bobg/gcsobj v0.0.0-20210103170834-62968b365dc7
+	github.com/bobg/gcsobj v0.1.0
 	github.com/bobg/htree v1.2.1
 	github.com/bobg/mid v1.2.3
 	github.com/bobg/subcmd v0.0.0-20210213180814-0c84b241b4b3

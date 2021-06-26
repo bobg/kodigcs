@@ -22,8 +22,6 @@ import (
 )
 
 func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
-	start := time.Now()
-
 	if s.username != "" && s.password != "" {
 		username, password, ok := req.BasicAuth()
 		if !ok || username != s.username || password != s.password {
@@ -61,12 +59,30 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 	}
 	defer r.Close()
 
+	if s.verbose {
+		log.Printf("Serving %s", objname)
+
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		start := time.Now()
+
+		go func() {
+			t := time.NewTimer(time.Minute)
+			for {
+				select {
+				case <-ctx.Done():
+					log.Printf("%s: served %d bytes in %s", objname, r.NRead(), time.Since(start))
+					break
+				case <-t.C:
+					log.Printf("%s: %d bytes [%s]", objname, r.NRead(), time.Since(start))
+				}
+			}
+		}()
+	}
+
 	http.ServeContent(w, req, path, time.Time{}, r)
 	// TODO: is it necessary to wrap w in order to detect an error here and propagate it out?
-
-	if s.verbose {
-		log.Printf("%s: %d bytes [%s]", objname, r.NRead(), time.Since(start))
-	}
 
 	return nil
 }

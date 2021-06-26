@@ -44,8 +44,8 @@ cloud.google.com/go/storage v1.15.0/go.mod h1:mjjQMoxxyGH7Jr8K5qrx6N2O0AHsczI61s
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/bobg/gcsobj v0.0.0-20210103170834-62968b365dc7 h1:ESPmdejTtg7amVOQp3owBUFh8sHkYeV0KFmgt1u9pAc=
-github.com/bobg/gcsobj v0.0.0-20210103170834-62968b365dc7/go.mod h1:vS49EQ1A1Ib8FgrL58C8xXYZyOCR2TgzAdopy6/ipa8=
+github.com/bobg/gcsobj v0.1.0 h1:UFwM8N+WNL8K/RBlXeSXMw6Q2wNXhbhE5Myda3mmJ0U=
+github.com/bobg/gcsobj v0.1.0/go.mod h1:vS49EQ1A1Ib8FgrL58C8xXYZyOCR2TgzAdopy6/ipa8=
 github.com/bobg/htree v1.2.1 h1:UfLQOFve4bSWOXUrAhcb2bcWkrkEKAyNuoAWbyDuRpQ=
 github.com/bobg/htree v1.2.1/go.mod h1:TeQov1b1cmHeO9VZESNfjAtyC8ekHuGdVpOqfczNJE0=
 github.com/bobg/mid v1.2.3 h1:vpD3j1PPgq1Jtsmy4CR5i5Z1l7cQaskmxEwdOQFlOkI=
