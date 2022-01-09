@@ -20,6 +20,7 @@ var (
 	runtimeRE1 = regexp.MustCompile(`^PT(\d+)M$`)
 	runtimeRE2 = regexp.MustCompile(`(\d+)h\s+(\d+)m`)
 	runtimeRE3 = regexp.MustCompile(`(\d+)min`)
+	runtimeRE4 = regexp.MustCompile(`(\d+)\s*hours?\s*(\d+)\s*minute`)
 )
 
 func parseIMDbID(inp string) string {
@@ -174,21 +175,41 @@ func getRuntimeMins(doc *html.Node) (int, error) {
 		if subEl != nil {
 			text, err := htree.Text(subEl)
 			if err != nil {
-				return 0, errors.Wrap(err, "getting runtime text")
+				return 0, errors.Wrap(err, "getting runtime text (1)")
 			}
 			if m := runtimeRE2.FindStringSubmatch(text); len(m) > 0 {
 				hrs, err := strconv.Atoi(m[1])
 				if err != nil {
-					return 0, errors.Wrapf(err, "parsing runtime %s", text)
+					return 0, errors.Wrapf(err, "parsing runtime %s (1)", text)
 				}
 				mins, err := strconv.Atoi(m[2])
 				if err != nil {
-					return 0, errors.Wrapf(err, "parsing runtime %s", text)
+					return 0, errors.Wrapf(err, "parsing runtime %s (2)", text)
 				}
 				return 60*hrs + mins, nil
 			}
 			if m := runtimeRE3.FindStringSubmatch(text); len(m) > 0 {
 				return strconv.Atoi(m[1])
+			}
+		}
+		subEl = htree.FindEl(runtimeEl, func(n *html.Node) bool {
+			return n.DataAtom == atom.Div && htree.ElClassContains(n, "ipc-metadata-list-item__content-container")
+		})
+		if subEl != nil {
+			text, err := htree.Text(subEl)
+			if err != nil {
+				return 0, errors.Wrap(err, "getting runtime text (2)")
+			}
+			if m := runtimeRE4.FindStringSubmatch(text); len(m) > 0 {
+				hrs, err := strconv.Atoi(m[1])
+				if err != nil {
+					return 0, errors.Wrapf(err, "parsing runtime %s (3)", text)
+				}
+				mins, err := strconv.Atoi(m[2])
+				if err != nil {
+					return 0, errors.Wrapf(err, "parsing runtime %s (4)", text)
+				}
+				return 60*hrs + mins, nil
 			}
 		}
 	}

@@ -81,15 +81,20 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 		}()
 	}
 
-	http.ServeContent(w, req, path, time.Time{}, r)
-	// TODO: is it necessary to wrap w in order to detect an error here and propagate it out?
-
+	wrapper := &mid.ResponseWrapper{W: w}
+	http.ServeContent(wrapper, req, path, time.Time{}, r)
+	if wrapper.Code < 200 || wrapper.Code >= 400 {
+		return mid.CodeErr{C: wrapper.Code}
+	}
 	return nil
 }
 
 func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir string) error {
 	if !s.subdirs && subdir != "" {
-		return fmt.Errorf("will not serve subdir \"%s\" in non-subdirs mode", subdir)
+		return mid.CodeErr{
+			C:   http.StatusBadRequest,
+			Err: fmt.Errorf("will not serve subdir \"%s\" in non-subdirs mode", subdir),
+		}
 	}
 
 	log.Printf("serving directory \"%s\"", subdir)
