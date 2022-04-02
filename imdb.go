@@ -21,6 +21,7 @@ var (
 	runtimeRE2 = regexp.MustCompile(`(\d+)h\s+(\d+)m`)
 	runtimeRE3 = regexp.MustCompile(`(\d+)min`)
 	runtimeRE4 = regexp.MustCompile(`(\d+)\s*hours?\s*(\d+)\s*minute`)
+	runtimeRE5 = regexp.MustCompile(`(\d+)\s*hour`)
 )
 
 func parseIMDbID(inp string) string {
@@ -210,6 +211,13 @@ func getRuntimeMins(doc *html.Node) (int, error) {
 					return 0, errors.Wrapf(err, "parsing runtime %s (4)", text)
 				}
 				return 60*hrs + mins, nil
+			}
+			if m := runtimeRE5.FindStringSubmatch(text); len(m) > 0 {
+				hrs, err := strconv.Atoi(m[1])
+				if err != nil {
+					return 0, errors.Wrapf(err, "parsing runtime %s (5)", text)
+				}
+				return 60 * hrs, nil
 			}
 		}
 	}
