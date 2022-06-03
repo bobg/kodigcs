@@ -35,14 +35,19 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 		return s.handleDir(w, req, "")
 	}
 
+	ctx := req.Context()
+
 	if path == "infomap" {
+		err := s.ensureInfoMap(ctx)
+		if err != nil {
+			return errors.Wrap(err, "getting info map")
+		}
+
 		s.mu.RLock()
 		defer s.mu.RUnlock()
 
 		return mid.RespondJSON(w, s.infoMap)
 	}
-
-	ctx := req.Context()
 
 	subdir, objname, err := s.parsePath(ctx, path)
 	if err != nil {
