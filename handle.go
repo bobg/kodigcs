@@ -35,6 +35,13 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 		return s.handleDir(w, req, "")
 	}
 
+	if path == "infomap" {
+		s.mu.RLock()
+		defer s.mu.Unlock()
+
+		return mid.RespondJSON(w, s.infoMap)
+	}
+
 	ctx := req.Context()
 
 	subdir, objname, err := s.parsePath(ctx, path)
@@ -234,7 +241,6 @@ func (s *server) ensureObjNames(ctx context.Context) error {
 		}
 		s.objNames = append(s.objNames, attrs.Name)
 	}
-
 	s.objNamesTime = time.Now()
 	return nil
 }
