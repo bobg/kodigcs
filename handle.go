@@ -37,7 +37,7 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 
 	if path == "infomap" {
 		s.mu.RLock()
-		defer s.mu.Unlock()
+		defer s.mu.RUnlock()
 
 		return mid.RespondJSON(w, s.infoMap)
 	}
