@@ -121,6 +121,9 @@ func parseIMDbPage(cl *http.Client, id string) (*imdbInfo, error) {
 		return nil, errors.Wrapf(err, "getting summary text for %s", titleURL)
 	}
 	result.Summary = strings.TrimSpace(summary)
+	if result.Summary == "" {
+		result.Summary = result.Description
+	}
 
 	runtimeMins, err := getRuntimeMins(doc)
 	if err != nil {
