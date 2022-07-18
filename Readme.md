@@ -26,6 +26,9 @@ Note:
 if you have a server host without a public URL,
 you might be able to give it one by using [ngrok](https://ngrok.com/).
 
+For more background about this project,
+see [this Medium article](https://bobglickstein.medium.com/i-have-realized-my-dvd-streaming-dreams-5769de5a0c0).
+
 ## Installing kodigcs
 
 Run:
