@@ -46,12 +46,10 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/bobg/gcsobj v0.1.0 h1:UFwM8N+WNL8K/RBlXeSXMw6Q2wNXhbhE5Myda3mmJ0U=
 github.com/bobg/gcsobj v0.1.0/go.mod h1:vS49EQ1A1Ib8FgrL58C8xXYZyOCR2TgzAdopy6/ipa8=
+github.com/bobg/go-generics v1.3.0 h1:tnLy79STeGmWMlGd2iJXNAPl1LrqqKTtwqRzZroRWgg=
+github.com/bobg/go-generics v1.3.0/go.mod h1:2c0zc1xzeC52OM0sKB4uUbb/OD90QFpJNIn984TKFBQ=
 github.com/bobg/htree v1.2.1 h1:UfLQOFve4bSWOXUrAhcb2bcWkrkEKAyNuoAWbyDuRpQ=
 github.com/bobg/htree v1.2.1/go.mod h1:TeQov1b1cmHeO9VZESNfjAtyC8ekHuGdVpOqfczNJE0=
-github.com/bobg/mid v1.2.3 h1:vpD3j1PPgq1Jtsmy4CR5i5Z1l7cQaskmxEwdOQFlOkI=
-github.com/bobg/mid v1.2.3/go.mod h1:yQjUtqgYcQm3gp3RFe09hBjcc2lmBkhu/2zojNCCbg4=
-github.com/bobg/mid v1.3.0 h1:i9DHWu/RsqsnJ45mO1qNsTxlWv3FyvmUuzNEPW4VPDs=
-github.com/bobg/mid v1.3.0/go.mod h1:yQjUtqgYcQm3gp3RFe09hBjcc2lmBkhu/2zojNCCbg4=
 github.com/bobg/mid v1.7.0 h1:WQA2dI8EjYUz9r839EjWSICQPqd2p9VwUvQfUsNeAWc=
 github.com/bobg/mid v1.7.0/go.mod h1:0XdctoS8z3lTMHzEyuHDo8vDrbvdbnBQqwPpTacYqc8=
 github.com/bobg/subcmd v0.0.0-20210213180814-0c84b241b4b3 h1:TJKiFC5AdDb6f5ENukW+tKUy9zoXnmh4pbRM6ZvCew4=

@@ -290,7 +290,7 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 				info.Title = val
 
 			case "sort":
-				info.SortTitle = val
+				info.SortTitle = strings.ToLower(val)
 
 			case "year":
 				year, err := strconv.Atoi(val)
@@ -392,6 +392,9 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 		)
 		if info.Title == "" {
 			info.Title = rootName
+		}
+		if info.SortTitle == "" {
+			info.SortTitle = sortTitle(info.Title)
 		}
 
 		s.infoMap[rootName] = info
