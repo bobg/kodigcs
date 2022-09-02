@@ -12,6 +12,7 @@ func sortTitle(s string) string {
 	s = strings.TrimSpace(s)
 	s = strings.ToLower(s)
 	s = strings.ReplaceAll(s, "&", " and ")
+	s = strings.ReplaceAll(s, "-", " ")
 
 	// Keep only letters, digits, and whitespace.
 	s = strings.Map(func(r rune) rune {

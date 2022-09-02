@@ -18,8 +18,11 @@ func TestSortTitle(t *testing.T) {
 		inp:  "9 to 5",
 		want: "nine to 5",
 	}, {
-		inp: "It's Garry Shandling's Show",
+		inp:  "It's Garry Shandling's Show",
 		want: "its garry shandlings show",
+	}, {
+		inp:  "The 40-Year-Old Virgin",
+		want: "forty year old virgin",
 	}}
 
 	for i, tc := range cases {
