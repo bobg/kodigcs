@@ -23,6 +23,21 @@ func TestSortTitle(t *testing.T) {
 	}, {
 		inp:  "The 40-Year-Old Virgin",
 		want: "forty year old virgin",
+	}, {
+		inp:  "42nd Street",
+		want: "forty-second street",
+	}, {
+		inp:  "The 30th Floor",
+		want: "thirtieth floor",
+	}, {
+		inp:  "The 501st Legion",
+		want: "five hundred first legion",
+	}, {
+		inp:  "The 600th Floor",
+		want: "six hundredth floor",
+	}, {
+		inp:  "350000000 Years of Solitude",
+		want: "three hundred fifty million years of solitude",
 	}}
 
 	for i, tc := range cases {
