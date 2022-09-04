@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bobg/bib"
 	"github.com/bobg/gcsobj"
 	"github.com/bobg/mid"
 	"github.com/pkg/errors"
@@ -394,7 +395,7 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 			info.Title = rootName
 		}
 		if info.SortTitle == "" {
-			info.SortTitle = sortTitle(info.Title)
+			info.SortTitle = bib.Key(info.Title)
 		}
 
 		s.infoMap[rootName] = info

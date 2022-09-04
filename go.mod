@@ -5,7 +5,7 @@ go 1.18
 require (
 	cloud.google.com/go/storage v1.15.0
 	github.com/bobg/gcsobj v0.1.0
-	github.com/bobg/go-generics v1.3.0
+	github.com/bobg/go-generics v1.4.0
 	github.com/bobg/htree v1.2.1
 	github.com/bobg/mid v1.7.0
 	github.com/bobg/subcmd v0.0.0-20210213180814-0c84b241b4b3
@@ -17,6 +17,7 @@ require (
 
 require (
 	cloud.google.com/go v0.82.0 // indirect
+	github.com/bobg/bib v0.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
