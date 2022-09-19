@@ -16,7 +16,13 @@ import (
 )
 
 var (
-	imdbRE     = regexp.MustCompile(`^https?://(?:www\.)?imdb\.com/title/([[:alnum:]]+)`)
+	// This regex parses an IMDb title URL,
+	// creating a capture group for the title's "ID" (e.g. "tt0076759" for Star Wars).
+	imdbRE = regexp.MustCompile(`^https?://(?:www\.)?imdb\.com/title/([[:alnum:]]+)`)
+
+	// Here are five different regular expression patterns for parsing a title's running time.
+	// They are tried one by one in getRuntimeMins (below)
+	// until we find one that succeeds.
 	runtimeRE1 = regexp.MustCompile(`^PT(\d+)M$`)
 	runtimeRE2 = regexp.MustCompile(`(\d+)h\s+(\d+)m`)
 	runtimeRE3 = regexp.MustCompile(`(\d+)min`)
