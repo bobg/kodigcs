@@ -47,6 +47,7 @@ func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 			"verbose", subcmd.Bool, false, "log each chunk of content as it's served",
 		),
 		"ssupdate", c.ssupdate, subcmd.Params(
+			"htmldir", subcmd.String, "", "directory of IMDb *.iso.html files",
 			"sheet", subcmd.String, "", "ID of Google spreadsheet with title metadata",
 		),
 	)
@@ -83,8 +84,8 @@ func (c maincmd) serve(ctx context.Context, bucketName, sheetID, listenAddr, cer
 	return errors.Wrap(err, "in ListenAndServe")
 }
 
-func (c maincmd) ssupdate(ctx context.Context, sheetID string, _ []string) error {
-	return updateSpreadsheet(ctx, c.credsFile, sheetID)
+func (c maincmd) ssupdate(ctx context.Context, htmldir, sheetID string, _ []string) error {
+	return updateSpreadsheet(ctx, c.credsFile, htmldir, sheetID)
 }
 
 func rootNamePrefix(rootName string) string {

@@ -55,7 +55,7 @@ kodigcs [-creds CREDS] serve -bucket BUCKETNAME [-sheet SHEET_ID] [-listen ADDR]
 ## Running kodigcs to update a metadata spreadsheet
 
 ```sh
-kodigcs [-creds CREDS] ssupdate -sheet SHEET_ID
+kodigcs [-creds CREDS] ssupdate -sheet SHEET_ID [-htmldir DIR]
 ```
 
 `CREDS` and `SHEET_ID` are as described above.
@@ -75,6 +75,13 @@ and that same row is missing some other detail,
 such as release year, directors, actors, etc.,
 then ssupdate will scrape the IMDb for that info
 and add it to the spreadsheet.
+**Update** Feb 2023:
+the IMDb now prohibits this scraping.
+As an alternative,
+you can use your browser to download the HTML for the desired IMDb page
+into a file named `Foo.iso.html`
+(for a row with a filename of `Foo.iso`)
+in the directory named by the `-htmldir` option.
 
 For this to work,
 the spreadsheet must be writable by the “service account” associated with the supplied credentials.

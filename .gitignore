@@ -1,5 +1,6 @@
 *~
-creds.json
-cert.pem
-key.pem
-kodigcs
+/CMD
+/creds.json
+/cert.pem
+/key.pem
+/kodigcs

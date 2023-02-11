@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -53,7 +56,7 @@ func handleSheet(sheetsSvc *sheets.SpreadsheetsService, sheetID string, f func(r
 	return nil
 }
 
-func updateSpreadsheet(ctx context.Context, credsFile, sheetID string) error {
+func updateSpreadsheet(ctx context.Context, credsFile, htmldir, sheetID string) error {
 	svc, err := sheets.NewService(ctx, option.WithCredentialsFile(credsFile), option.WithScopes(sheets.SpreadsheetsScope))
 	if err != nil {
 		return errors.Wrap(err, "creating sheets service")
@@ -85,28 +88,7 @@ func updateSpreadsheet(ctx context.Context, credsFile, sheetID string) error {
 	}
 
 	return handleSheet(svc.Spreadsheets, sheetID, func(rownum int, headings []string, name string, row []interface{}) error {
-		var (
-			id         string
-			needLookup bool
-		)
-		for j, heading := range headings {
-			if j >= len(row) {
-				break
-			}
-			if heading != "imdbid" {
-				continue
-			}
-			val, ok := row[j].(string)
-			if !ok {
-				return nil
-			}
-			id = parseIMDbID(val)
-		}
-
-		if id == "" {
-			return nil
-		}
-
+		var needLookup bool
 		for j, heading := range headings {
 			switch heading {
 			case "actors", "directors", "genre", "poster", "year", "plot", "runtime":
@@ -125,16 +107,55 @@ func updateSpreadsheet(ctx context.Context, credsFile, sheetID string) error {
 				}
 			}
 		}
-
 		if !needLookup {
 			return nil
 		}
 
-		log.Printf("Getting IMDb info for %s...", name)
+		var info *imdbInfo
+		if htmldir != "" {
+			filename := filepath.Join(htmldir, name+".html")
+			f, err := os.Open(filename)
+			if errors.Is(err, fs.ErrNotExist) {
+				// ok
+			} else if err != nil {
+				return errors.Wrapf(err, "opening %s", filename)
+			} else {
+				defer f.Close()
 
-		info, err := parseIMDbPage(cl, id)
-		if err != nil {
-			return errors.Wrapf(err, "getting IMDb info for %s (id %s)", name, id)
+				log.Printf("Getting IMDb info for %s from %s...\n", name, filename)
+
+				info, err = parseIMDbHTML(f)
+				if err != nil {
+					return errors.Wrapf(err, "parsing %s", filename)
+				}
+			}
+		}
+
+		if info == nil {
+			var id string
+			for j, heading := range headings {
+				if j >= len(row) {
+					break
+				}
+				if heading != "imdbid" {
+					continue
+				}
+				val, ok := row[j].(string)
+				if !ok {
+					return nil
+				}
+				id = parseIMDbID(val)
+			}
+			if id == "" {
+				return nil
+			}
+
+			log.Printf("Getting IMDb info for %s...", name)
+
+			info, err = parseIMDbPage(cl, id)
+			if err != nil {
+				return errors.Wrapf(err, "getting IMDb info for %s (id %s)", name, id)
+			}
 		}
 
 		for j, heading := range headings {

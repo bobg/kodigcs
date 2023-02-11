@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -73,22 +74,26 @@ func parseIMDbPage(cl *http.Client, id string) (*imdbInfo, error) {
 		return nil, fmt.Errorf("status %d (%s) getting %s", resp.StatusCode, http.StatusText(resp.StatusCode), titleURL)
 	}
 
-	doc, err := html.Parse(resp.Body)
+	return parseIMDbHTML(resp.Body)
+}
+
+func parseIMDbHTML(r io.Reader) (*imdbInfo, error) {
+	doc, err := html.Parse(r)
 	if err != nil {
-		return nil, errors.Wrapf(err, "parsing response from %s", titleURL)
+		return nil, errors.Wrap(err, "parsing HTML")
 	}
 
 	headEl := htree.FindEl(doc, func(n *html.Node) bool {
 		return n.DataAtom == atom.Head
 	})
 	if headEl == nil {
-		return nil, fmt.Errorf("no HEAD in response from %s", titleURL)
+		return nil, fmt.Errorf("no HEAD in HTML")
 	}
 	jsonEl := htree.FindEl(headEl, func(n *html.Node) bool {
 		return n.DataAtom == atom.Script && htree.ElAttr(n, "type") == "application/ld+json"
 	})
 	if jsonEl == nil {
-		return nil, fmt.Errorf("no info JSON in response from %s", titleURL)
+		return nil, fmt.Errorf("no info JSON in HTML")
 	}
 
 	jsonBuf := new(bytes.Buffer)
@@ -99,7 +104,7 @@ func parseIMDbPage(cl *http.Client, id string) (*imdbInfo, error) {
 	var result imdbInfo
 	err = json.Unmarshal(jsonBuf.Bytes(), &result)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unmarshaling JSON in response from %s", titleURL)
+		return nil, errors.Wrapf(err, "unmarshaling JSON in HTML")
 	}
 
 	result.Actors, err = parsePersons(result.RawActor)
@@ -124,7 +129,7 @@ func parseIMDbPage(cl *http.Client, id string) (*imdbInfo, error) {
 
 	summary, err := getSummary(doc)
 	if err != nil {
-		return nil, errors.Wrapf(err, "getting summary text for %s", titleURL)
+		return nil, errors.Wrap(err, "getting summary text")
 	}
 	result.Summary = strings.TrimSpace(summary)
 	if result.Summary == "" {
@@ -133,7 +138,7 @@ func parseIMDbPage(cl *http.Client, id string) (*imdbInfo, error) {
 
 	runtimeMins, err := getRuntimeMins(doc)
 	if err != nil {
-		return nil, errors.Wrapf(err, "getting runtime for %s", titleURL)
+		return nil, errors.Wrap(err, "getting runtime")
 	}
 	if runtimeMins > 0 {
 		result.RuntimeMins = runtimeMins
