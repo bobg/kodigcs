@@ -11,6 +11,7 @@ import (
 	"net/http"
 
 	"cloud.google.com/go/storage"
+	"github.com/bobg/ctrlc"
 	"github.com/bobg/mid"
 	"github.com/bobg/subcmd"
 	"github.com/pkg/errors"
@@ -54,34 +55,36 @@ func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 }
 
 func (c maincmd) serve(ctx context.Context, bucketName, sheetID, listenAddr, certFile, keyFile, username, password string, subdirs, verbose bool, _ []string) error {
-	client, err := storage.NewClient(ctx, option.WithCredentialsFile(c.credsFile))
-	if err != nil {
-		log.Fatal(err)
-	}
+	return ctrlc.Run(ctx, func(ctx context.Context) error {
+		client, err := storage.NewClient(ctx, option.WithCredentialsFile(c.credsFile))
+		if err != nil {
+			return errors.Wrap(err, "creating GCS client")
+		}
 
-	s := &server{
-		bucket:      client.Bucket(bucketName),
-		credsFile:   c.credsFile,
-		sheetID:     sheetID,
-		dirTemplate: template.Must(template.New("").Parse(dirTemplate)),
-		username:    username,
-		password:    password,
-		subdirs:     subdirs,
-		verbose:     verbose,
-	}
+		s := &server{
+			bucket:      client.Bucket(bucketName),
+			credsFile:   c.credsFile,
+			sheetID:     sheetID,
+			dirTemplate: template.Must(template.New("").Parse(dirTemplate)),
+			username:    username,
+			password:    password,
+			subdirs:     subdirs,
+			verbose:     verbose,
+		}
 
-	http.Handle("/", mid.Err(s.handle))
+		http.Handle("/", mid.Err(s.handle))
 
-	log.Printf("Listening on %s", listenAddr)
-	if certFile != "" && keyFile != "" {
-		err = http.ListenAndServeTLS(listenAddr, certFile, keyFile, nil)
-	} else {
-		err = http.ListenAndServe(listenAddr, nil)
-	}
-	if errors.Is(err, http.ErrServerClosed) {
-		return nil
-	}
-	return errors.Wrap(err, "in ListenAndServe")
+		log.Printf("Listening on %s", listenAddr)
+		if certFile != "" && keyFile != "" {
+			err = http.ListenAndServeTLS(listenAddr, certFile, keyFile, nil)
+		} else {
+			err = http.ListenAndServe(listenAddr, nil)
+		}
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return errors.Wrap(err, "in ListenAndServe")
+	})
 }
 
 func (c maincmd) ssupdate(ctx context.Context, htmldir, sheetID string, _ []string) error {

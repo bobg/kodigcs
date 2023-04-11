@@ -1,10 +1,11 @@
 module github.com/bobg/kodigcs
 
-go 1.18
+go 1.20
 
 require (
 	cloud.google.com/go/storage v1.15.0
 	github.com/bobg/bib v0.1.1
+	github.com/bobg/ctrlc v0.0.0-20230409165555-645b91f50971
 	github.com/bobg/gcsobj v0.1.0
 	github.com/bobg/htree v1.2.1
 	github.com/bobg/mid v1.7.0

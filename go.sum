@@ -46,6 +46,8 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/bobg/bib v0.1.1 h1:gsXNWBcQlnT66i+PGTDz+uhr/hEd12a2kzGi12l1WD0=
 github.com/bobg/bib v0.1.1/go.mod h1:pVUpS7oNn0EpASBWKwis/ky/7ZpXNhbAOMvNjO10DDg=
+github.com/bobg/ctrlc v0.0.0-20230409165555-645b91f50971 h1:fF18FGObkiSTtM0YJCsLLYD1SdPzQXjuM1qHyISzKUs=
+github.com/bobg/ctrlc v0.0.0-20230409165555-645b91f50971/go.mod h1:LJB0xcIFmKh5kR1n7EGVu6FbmdOv/w08+SV3lxDcAW0=
 github.com/bobg/gcsobj v0.1.0 h1:UFwM8N+WNL8K/RBlXeSXMw6Q2wNXhbhE5Myda3mmJ0U=
 github.com/bobg/gcsobj v0.1.0/go.mod h1:vS49EQ1A1Ib8FgrL58C8xXYZyOCR2TgzAdopy6/ipa8=
 github.com/bobg/go-generics v1.5.0 h1:BiVzUWzJKn6wMC3eAfwy3PctCQhwRUFaTncl0R57s74=
