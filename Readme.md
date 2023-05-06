@@ -34,7 +34,7 @@ see [this Medium article](https://bobglickstein.medium.com/i-have-realized-my-dv
 Run:
 
 ```sh
-go get github.com/bobg/kodigcs
+go install github.com/bobg/kodigcs@latest
 ```
 
 ## Running kodigcs in server mode
