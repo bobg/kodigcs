@@ -77,7 +77,7 @@ func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 	)
 }
 
-func (c maincmd) serve(ctx context.Context, bucketName, sheetID, listenAddr, certFile, keyFile, username, password string, subdirs, verbose bool, _ []string) error {
+func (c maincmd) serve(ctx context.Context, sheetID, listenAddr, certFile, keyFile, username, password string, subdirs, verbose bool, _ []string) error {
 	return ctrlc.Run(ctx, func(ctx context.Context) error {
 		s := &server{
 			ssvc:        c.ssvc,
