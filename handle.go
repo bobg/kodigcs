@@ -136,6 +136,8 @@ func (s *server) handleThumb(w http.ResponseWriter, req *http.Request) error {
 		}
 		defer r.Close()
 
+		log.Printf("Serving local thumb %s", path)
+
 		http.ServeContent(w, req, "/thumbs/"+path, time.Time{}, r)
 		return nil
 	}
@@ -161,6 +163,8 @@ func (s *server) handleThumb(w http.ResponseWriter, req *http.Request) error {
 			Err: fmt.Errorf("no redirect URL for /thumbs/%s", path),
 		}
 	}
+
+	log.Printf("Redirecting /thumbs/%s to %s", path, matches[0].origVal)
 
 	http.Redirect(w, req, matches[0].origVal, http.StatusFound)
 	return nil
