@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,9 +14,9 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/pkg/errors"
 	"golang.org/x/time/rate"
-	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
 )
 
@@ -56,12 +58,7 @@ func handleSheet(sheetsSvc *sheets.SpreadsheetsService, sheetID string, f func(r
 	return nil
 }
 
-func updateSpreadsheet(ctx context.Context, credsFile, htmldir, sheetID string) error {
-	svc, err := sheets.NewService(ctx, option.WithCredentialsFile(credsFile), option.WithScopes(sheets.SpreadsheetsScope))
-	if err != nil {
-		return errors.Wrap(err, "creating sheets service")
-	}
-
+func updateSpreadsheet(ctx context.Context, ssvc *sheets.SpreadsheetsService, bucket *storage.BucketHandle, htmldir, sheetID string) error {
 	var (
 		httpLimiter = rate.NewLimiter(rate.Every(10*time.Second), 1)
 		ssLimiter   = rate.NewLimiter(rate.Every(time.Second), 1)
@@ -75,19 +72,18 @@ func updateSpreadsheet(ctx context.Context, credsFile, htmldir, sheetID string) 
 	}
 
 	ssSet := func(cell, val string) error {
-		err := ssLimiter.Wait(ctx)
-		if err != nil {
+		if err := ssLimiter.Wait(ctx); err != nil {
 			return errors.Wrap(err, "waiting for ssLimiter")
 		}
 		vr := &sheets.ValueRange{
 			Range:  cell,
 			Values: [][]interface{}{{val}},
 		}
-		_, err = svc.Spreadsheets.Values.Update(sheetID, cell, vr).Context(ctx).ValueInputOption("RAW").Do()
+		_, err := ssvc.Values.Update(sheetID, cell, vr).Context(ctx).ValueInputOption("RAW").Do()
 		return errors.Wrap(err, "updating cell %s in spreadsheet")
 	}
 
-	return handleSheet(svc.Spreadsheets, sheetID, func(rownum int, headings []string, name string, row []interface{}) error {
+	return handleSheet(ssvc, sheetID, func(rownum int, headings []string, name string, row []interface{}) error {
 		var needLookup bool
 		for j, heading := range headings {
 			switch heading {
@@ -111,7 +107,11 @@ func updateSpreadsheet(ctx context.Context, credsFile, htmldir, sheetID string) 
 			return nil
 		}
 
-		var info *imdbInfo
+		var (
+			info *imdbInfo
+			err  error
+		)
+
 		if htmldir != "" {
 			filename := filepath.Join(htmldir, name+".html")
 			f, err := os.Open(filename)
@@ -200,9 +200,14 @@ func updateSpreadsheet(ctx context.Context, credsFile, htmldir, sheetID string) 
 				}
 
 			case "poster":
-				err = ssSet(cell, info.Image)
-				if err != nil {
+				if info.Image == "" {
+					continue
+				}
+				if err = ssSet(cell, info.Image); err != nil {
 					return errors.Wrapf(err, "setting %s to %s", cell, info.Image)
+				}
+				if err = uploadPoster(ctx, bucket, cl, info.Image, name, false); err != nil {
+					return errors.Wrapf(err, "uploading poster for %s", name)
 				}
 
 			case "year":
@@ -233,6 +238,65 @@ func updateSpreadsheet(ctx context.Context, credsFile, htmldir, sheetID string) 
 
 		return nil
 	})
+}
+
+func uploadPoster(ctx context.Context, bucket *storage.BucketHandle, cl *http.Client, url, name string, force bool) error {
+	var (
+		urlExt   = filepath.Ext(url)
+		nameExt  = filepath.Ext(name)
+		rootName = strings.TrimSuffix(name, nameExt)
+		objName  = rootName + urlExt
+		obj      = bucket.Object(objName)
+	)
+
+	if urlExt == nameExt {
+		log.Printf("  Skipping poster for %s; URL has identical extension", name)
+		return nil
+	}
+
+	if !force {
+		// Does obj already exist?
+		_, err := obj.Attrs(ctx)
+		if err == nil {
+			log.Printf("  object %s already exists", objName)
+			return nil
+		}
+		if !errors.Is(err, storage.ErrObjectNotExist) {
+			return errors.Wrapf(err, "getting attrs for %s", objName)
+		}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return errors.Wrapf(err, "creating request for %s", url)
+	}
+	resp, err := cl.Do(req)
+	if err != nil {
+		return errors.Wrapf(err, "getting %s", url)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("getting %s: %s", url, resp.Status)
+	}
+
+	log.Printf("Uploading poster for %s...", name)
+
+	w := obj.NewWriter(ctx)
+	defer w.Close()
+
+	contentType, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	if err == nil { // sic
+		w.ContentType = contentType
+	}
+
+	_, err = io.Copy(w, resp.Body)
+	if err != nil {
+		return errors.Wrapf(err, "copying %s to GCS", url)
+	}
+
+	err = w.Close()
+	return errors.Wrap(err, "closing GCS writer")
 }
 
 // Row and col are both zero-based.

@@ -6,9 +6,11 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"flag"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/bobg/ctrlc"
@@ -17,27 +19,50 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/time/rate"
 	"google.golang.org/api/option"
+	"google.golang.org/api/sheets/v4"
 )
 
 func main() {
-	credsFile := flag.String("creds", "creds.json", "path to service-account credentials JSON file")
+	var (
+		credsFile = flag.String("creds", "creds.json", "path to service-account credentials JSON file")
+		bucket    = flag.String("bucket", "", "Google Cloud Storage bucket name")
+	)
 	flag.Parse()
 
-	c := maincmd{credsFile: *credsFile}
-	err := subcmd.Run(context.Background(), c, flag.Args())
+	if *bucket == "" {
+		log.Fatal("Must specify -bucket")
+	}
+
+	ctx := context.Background()
+
+	gcs, err := storage.NewClient(ctx, option.WithCredentialsFile(*credsFile))
 	if err != nil {
+		log.Fatalf("Error creating GCS client: %s", err)
+	}
+
+	// TODO: For the serve subcommand we only need sheets.SpreadsheetsReadonlyScope.
+	ssvc, err := sheets.NewService(ctx, option.WithCredentialsFile(*credsFile), option.WithScopes(sheets.SpreadsheetsScope))
+	if err != nil {
+		log.Fatalf("Error creating sheets service: %s", err)
+	}
+
+	c := maincmd{
+		ssvc:   ssvc.Spreadsheets,
+		bucket: gcs.Bucket(*bucket),
+	}
+	if err := subcmd.Run(ctx, c, flag.Args()); err != nil {
 		log.Fatal(err)
 	}
 }
 
 type maincmd struct {
-	credsFile string
+	ssvc   *sheets.SpreadsheetsService
+	bucket *storage.BucketHandle
 }
 
 func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 	return subcmd.Commands(
 		"serve", c.serve, subcmd.Params(
-			"bucket", subcmd.String, "", "Google Cloud Storage bucket name",
 			"sheet", subcmd.String, "", "ID of Google spreadsheet with title metadata",
 			"listen", subcmd.String, ":1549", "listen address",
 			"cert", subcmd.String, "", "path to cert file",
@@ -51,19 +76,19 @@ func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 			"htmldir", subcmd.String, "", "directory of IMDb *.iso.html files",
 			"sheet", subcmd.String, "", "ID of Google spreadsheet with title metadata",
 		),
+		"posters", c.posters, subcmd.Params(
+			"sheet", subcmd.String, "", "ID of Google spreadsheet with title metadata",
+			"offset", subcmd.Int, 0, "row number to start at",
+			"force", subcmd.Bool, false, "whether to force re-upload of existing posters",
+		),
 	)
 }
 
 func (c maincmd) serve(ctx context.Context, bucketName, sheetID, listenAddr, certFile, keyFile, username, password string, subdirs, verbose bool, _ []string) error {
 	return ctrlc.Run(ctx, func(ctx context.Context) error {
-		client, err := storage.NewClient(ctx, option.WithCredentialsFile(c.credsFile))
-		if err != nil {
-			return errors.Wrap(err, "creating GCS client")
-		}
-
 		s := &server{
-			bucket:      client.Bucket(bucketName),
-			credsFile:   c.credsFile,
+			ssvc:        c.ssvc,
+			bucket:      c.bucket,
 			sheetID:     sheetID,
 			dirTemplate: template.Must(template.New("").Parse(dirTemplate)),
 			username:    username,
@@ -72,9 +97,13 @@ func (c maincmd) serve(ctx context.Context, bucketName, sheetID, listenAddr, cer
 			verbose:     verbose,
 		}
 
+		http.Handle("/thumbs/", mid.Err(s.handleThumb))
 		http.Handle("/", mid.Err(s.handle))
 
 		log.Printf("Listening on %s", listenAddr)
+
+		var err error
+
 		if certFile != "" && keyFile != "" {
 			err = http.ListenAndServeTLS(listenAddr, certFile, keyFile, nil)
 		} else {
@@ -88,7 +117,58 @@ func (c maincmd) serve(ctx context.Context, bucketName, sheetID, listenAddr, cer
 }
 
 func (c maincmd) ssupdate(ctx context.Context, htmldir, sheetID string, _ []string) error {
-	return updateSpreadsheet(ctx, c.credsFile, htmldir, sheetID)
+	return updateSpreadsheet(ctx, c.ssvc, c.bucket, htmldir, sheetID)
+}
+
+func (c maincmd) posters(ctx context.Context, sheetID string, offset int, force bool, _ []string) error {
+	var (
+		httpLimiter = rate.NewLimiter(rate.Every(10*time.Second), 1)
+		ssLimiter   = rate.NewLimiter(rate.Every(time.Second), 1)
+	)
+
+	cl := &http.Client{
+		Transport: &limitedTransport{
+			limiter:   httpLimiter,
+			transport: http.DefaultTransport,
+		},
+	}
+
+	var posterCol int
+
+	return handleSheet(c.ssvc, sheetID, func(rownum int, headings []string, name string, row []interface{}) error {
+		if rownum < offset {
+			return nil
+		}
+
+		log.Printf("Row %d: %s", rownum, name)
+
+		if err := ssLimiter.Wait(ctx); err != nil {
+			return errors.Wrap(err, "waiting for ssLimiter")
+		}
+
+		if posterCol == 0 {
+			for i, heading := range headings {
+				if heading == "poster" {
+					posterCol = i
+					break
+				}
+			}
+			if posterCol == 0 {
+				return fmt.Errorf("no poster column found")
+			}
+		}
+		if len(row) <= posterCol {
+			return nil
+		}
+		poster, ok := row[posterCol].(string)
+		if !ok {
+			return nil
+		}
+		if poster == "" {
+			return nil
+		}
+		return uploadPoster(ctx, c.bucket, cl, poster, name, force)
+	})
 }
 
 func rootNamePrefix(rootName string) string {
@@ -120,6 +200,7 @@ type (
 		XMLName xml.Name `xml:"thumb"`
 		Aspect  string   `xml:"aspect,attr"`
 		Val     string   `xml:",chardata"`
+		origVal string
 	}
 
 	actor struct {

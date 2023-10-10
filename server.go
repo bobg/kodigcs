@@ -6,13 +6,15 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/bobg/go-generics/v2/set"
+	"google.golang.org/api/sheets/v4"
 )
 
 type server struct {
+	ssvc   *sheets.SpreadsheetsService
 	bucket *storage.BucketHandle
 
-	credsFile string
-	sheetID   string
+	sheetID string
 
 	dirTemplate *template.Template
 
@@ -22,7 +24,7 @@ type server struct {
 	verbose bool
 
 	mu           sync.RWMutex // protects all of the following
-	objNames     []string
+	objNames     set.Of[string]
 	objNamesTime time.Time
 	infoMap      map[string]movieInfo
 	infoMapTime  time.Time
