@@ -114,6 +114,12 @@ func (s *server) handleThumb(w http.ResponseWriter, req *http.Request) error {
 	path := strings.Trim(req.URL.Path, "/")
 	path = strings.TrimPrefix(path, "thumbs/")
 
+	var err error
+	path, err = url.PathUnescape(path)
+	if err != nil {
+		return errors.Wrapf(err, "unescaping path %s", path)
+	}
+
 	ctx := req.Context()
 	if err := s.ensureObjNames(ctx); err != nil {
 		return errors.Wrap(err, "getting obj names")
@@ -386,7 +392,7 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 
 				if len(info.Thumbs) == 0 {
 					valExt := filepath.Ext(val)
-					val = "/thumbs/" + rootName + valExt // foo.iso -> /thumbs/foo.jpg
+					val = "/thumbs/" + url.PathEscape(rootName) + valExt // foo.iso -> /thumbs/foo.jpg
 				}
 				info.Thumbs = append(info.Thumbs, thumb{
 					Aspect:  heading,
