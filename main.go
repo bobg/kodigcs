@@ -84,6 +84,7 @@ func (c maincmd) serve(ctx context.Context, sheetID, listenAddr, certFile, keyFi
 			bucket:      c.bucket,
 			sheetID:     sheetID,
 			dirTemplate: template.Must(template.New("").Parse(dirTemplate)),
+			listenAddr:  listenAddr,
 			username:    username,
 			password:    password,
 			subdirs:     subdirs,
@@ -98,6 +99,7 @@ func (c maincmd) serve(ctx context.Context, sheetID, listenAddr, certFile, keyFi
 		var err error
 
 		if certFile != "" && keyFile != "" {
+			s.tls = true
 			err = http.ListenAndServeTLS(listenAddr, certFile, keyFile, nil)
 		} else {
 			err = http.ListenAndServe(listenAddr, nil)

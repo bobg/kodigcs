@@ -392,7 +392,7 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 
 				if len(info.Thumbs) == 0 {
 					valExt := filepath.Ext(val)
-					val = "/thumbs/" + url.PathEscape(rootName) + valExt // foo.iso -> /thumbs/foo.jpg
+					val = s.relURL("thumbs/" + url.PathEscape(rootName) + valExt) // "foo bar.iso" -> http://host:port/thumbs/foo%20bar.jpg
 				}
 				info.Thumbs = append(info.Thumbs, thumb{
 					Aspect:  heading,
@@ -497,6 +497,21 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 
 	s.infoMapTime = time.Now()
 	return nil
+}
+
+func (s *server) relURL(path string) string {
+	scheme := "http"
+	if s.tls {
+		scheme = "https"
+	}
+
+	u := &url.URL{
+		Scheme: scheme,
+		Host:   s.listenAddr,
+		Path:   path,
+	}
+
+	return u.String()
 }
 
 func splitsemi(s string) []string {

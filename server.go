@@ -18,10 +18,12 @@ type server struct {
 
 	dirTemplate *template.Template
 
+	listenAddr         string
 	username, password string
 
 	subdirs bool
 	verbose bool
+	tls     bool
 
 	mu           sync.RWMutex // protects all of the following
 	objNames     set.Of[string]
