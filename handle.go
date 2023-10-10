@@ -15,11 +15,11 @@ import (
 
 	"github.com/bobg/bib"
 	"github.com/bobg/gcsobj"
+	"github.com/bobg/go-generics/v2/set"
+	"github.com/bobg/go-generics/v2/slices"
 	"github.com/bobg/mid"
 	"github.com/pkg/errors"
 	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
-	"google.golang.org/api/sheets/v4"
 )
 
 func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
@@ -102,6 +102,70 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+func (s *server) handleThumb(w http.ResponseWriter, req *http.Request) error {
+	if s.username != "" && s.password != "" {
+		username, password, ok := req.BasicAuth()
+		if !ok || username != s.username || password != s.password {
+			w.Header().Add("WWW-Authenticate", `Basic realm="Access to list and stream titles"`)
+			return mid.CodeErr{C: http.StatusUnauthorized}
+		}
+	}
+
+	path := strings.Trim(req.URL.Path, "/")
+	path = strings.TrimPrefix(path, "thumbs/")
+
+	ctx := req.Context()
+	if err := s.ensureObjNames(ctx); err != nil {
+		return errors.Wrap(err, "getting obj names")
+	}
+
+	if err := s.ensureInfoMap(ctx); err != nil {
+		return errors.Wrap(err, "in ensureInfoMap")
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.objNames.Has(path) {
+		// Serve this thumb from the bucket.
+
+		obj := s.bucket.Object(path)
+		r, err := gcsobj.NewReader(ctx, obj)
+		if err != nil {
+			return errors.Wrapf(err, "creating reader for object %s", path)
+		}
+		defer r.Close()
+
+		http.ServeContent(w, req, "/thumbs/"+path, time.Time{}, r)
+		return nil
+	}
+
+	// Redirect to the thumb's actual URL.
+
+	var (
+		ext  = filepath.Ext(path)
+		root = strings.TrimSuffix(path, ext)
+	)
+
+	entry, ok := s.infoMap[root]
+	if !ok {
+		return mid.CodeErr{
+			C:   http.StatusNotFound,
+			Err: fmt.Errorf("no infoMap entry for /thumbs/%s", path),
+		}
+	}
+	matches := slices.Filter(entry.Thumbs, func(th thumb) bool { return th.Val == path })
+	if len(matches) == 0 {
+		return mid.CodeErr{
+			C:   http.StatusNotFound,
+			Err: fmt.Errorf("no redirect URL for /thumbs/%s", path),
+		}
+	}
+
+	http.Redirect(w, req, matches[0].origVal, http.StatusFound)
+	return nil
+}
+
 func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir string) error {
 	if !s.subdirs && subdir != "" {
 		return mid.CodeErr{
@@ -128,26 +192,36 @@ func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir stri
 	defer s.mu.RUnlock()
 
 	var items []template.URL
-	for _, objName := range s.objNames {
-		if ext := filepath.Ext(objName); ext != ".nfo" {
-			rootName := strings.TrimSuffix(objName, ext)
-			info, ok := s.infoMap[rootName]
-			if ok && s.subdirs && info.subdir != subdir {
-				continue
-			}
-			if !ok && s.subdirs && subdir != "" {
-				continue
-			}
-
-			// We add a prefix to the entry names based on the rootname's hash.
-			// This is because Kodi doesn't seem to be able to distinguish between two different entries
-			// that are identical for the first N bytes, for some value of N.
-			// E.g., "The Best of The Electric Company, Vol. 2, Disc 1" looks the same to Kodi as
-			// "The Best of The Electric Company, Vol. 2, Disc 2".
-			prefix := rootNamePrefix(rootName)
-			items = append(items, template.URL(prefix+objName), template.URL(prefix+rootName+".nfo"))
+	s.objNames.Each(func(objName string) {
+		ext := filepath.Ext(objName)
+		switch ext {
+		case ".iso", ".m2ts", ".m4v":
+			// ok
+		default:
+			return
 		}
-	}
+
+		if ext != ".iso" {
+			return
+		}
+
+		rootName := strings.TrimSuffix(objName, ext)
+		info, ok := s.infoMap[rootName]
+		if ok && s.subdirs && info.subdir != subdir {
+			return
+		}
+		if !ok && s.subdirs && subdir != "" {
+			return
+		}
+
+		// We add a prefix to the entry names based on the rootname's hash.
+		// This is because Kodi doesn't seem to be able to distinguish between two different entries
+		// that are identical for the first N bytes, for some value of N.
+		// E.g., "The Best of The Electric Company, Vol. 2, Disc 1" looks the same to Kodi as
+		// "The Best of The Electric Company, Vol. 2, Disc 2".
+		prefix := rootNamePrefix(rootName)
+		items = append(items, template.URL(prefix+objName), template.URL(prefix+rootName+".nfo"))
+	})
 
 	if s.subdirs && subdir == "" {
 		subdirs := make(map[string]struct{})
@@ -229,13 +303,14 @@ func (s *server) ensureObjNames(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if len(s.objNames) > 0 && !isStale(s.objNamesTime) {
+	if s.objNames != nil && s.objNames.Len() > 0 && !isStale(s.objNamesTime) {
 		return nil
 	}
 
 	log.Print("loading bucket")
 
-	s.objNames = nil
+	s.objNames = set.New[string]()
+
 	iter := s.bucket.Objects(ctx, nil)
 	for {
 		attrs, err := iter.Next()
@@ -245,7 +320,7 @@ func (s *server) ensureObjNames(ctx context.Context) error {
 		if err != nil {
 			return errors.Wrap(err, "iterating over bucket")
 		}
-		s.objNames = append(s.objNames, attrs.Name)
+		s.objNames.Add(attrs.Name)
 	}
 	s.objNamesTime = time.Now()
 	return nil
@@ -265,13 +340,14 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 	log.Print("loading spreadsheet")
 
 	s.infoMap = make(map[string]movieInfo)
-	svc, err := sheets.NewService(ctx, option.WithCredentialsFile(s.credsFile), option.WithScopes(sheets.SpreadsheetsReadonlyScope))
-	if err != nil {
-		return errors.Wrap(err, "creating sheets service")
-	}
 
-	err = handleSheet(svc.Spreadsheets, s.sheetID, func(_ int, headings []string, name string, row []interface{}) error {
+	err := handleSheet(s.ssvc, s.sheetID, func(_ int, headings []string, name string, row []interface{}) error {
 		var info movieInfo
+
+		var (
+			ext      = filepath.Ext(name)
+			rootName = strings.TrimSuffix(name, ext)
+		)
 
 		for j, rawval := range row {
 			if j == 0 {
@@ -302,9 +378,16 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 				info.Year = year
 
 			case "banner", "clearart", "clearlogo", "discart", "landscape", "poster":
+				origVal := val
+
+				if len(info.Thumbs) == 0 {
+					valExt := filepath.Ext(val)
+					val = "/thumbs/" + rootName + valExt // foo.iso -> /thumbs/foo.jpg
+				}
 				info.Thumbs = append(info.Thumbs, thumb{
-					Aspect: heading,
-					Val:    val,
+					Aspect:  heading,
+					Val:     val,
+					origVal: origVal,
 				})
 
 			case "directors":
@@ -387,10 +470,6 @@ func (s *server) ensureInfoMap(ctx context.Context) error {
 			}
 		}
 
-		var (
-			ext      = filepath.Ext(name)
-			rootName = strings.TrimSuffix(name, ext)
-		)
 		if info.Title == "" {
 			info.Title = rootName
 		}

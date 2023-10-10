@@ -17,27 +17,50 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/time/rate"
 	"google.golang.org/api/option"
+	"google.golang.org/api/sheets/v4"
 )
 
 func main() {
-	credsFile := flag.String("creds", "creds.json", "path to service-account credentials JSON file")
+	var (
+		credsFile = flag.String("creds", "creds.json", "path to service-account credentials JSON file")
+		bucket    = flag.String("bucket", "", "Google Cloud Storage bucket name")
+	)
 	flag.Parse()
 
-	c := maincmd{credsFile: *credsFile}
-	err := subcmd.Run(context.Background(), c, flag.Args())
+	if *bucket == "" {
+		log.Fatal("Must specify -bucket")
+	}
+
+	ctx := context.Background()
+
+	gcs, err := storage.NewClient(ctx, option.WithCredentialsFile(*credsFile))
 	if err != nil {
+		log.Fatalf("Error creating GCS client: %s", err)
+	}
+
+	// TODO: For the serve subcommand we only need sheets.SpreadsheetsReadonlyScope.
+	ssvc, err := sheets.NewService(ctx, option.WithCredentialsFile(*credsFile), option.WithScopes(sheets.SpreadsheetsScope))
+	if err != nil {
+		log.Fatalf("Error creating sheets service: %s", err)
+	}
+
+	c := maincmd{
+		ssvc:   ssvc.Spreadsheets,
+		bucket: gcs.Bucket(*bucket),
+	}
+	if err := subcmd.Run(ctx, c, flag.Args()); err != nil {
 		log.Fatal(err)
 	}
 }
 
 type maincmd struct {
-	credsFile string
+	ssvc   *sheets.SpreadsheetsService
+	bucket *storage.BucketHandle
 }
 
 func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 	return subcmd.Commands(
 		"serve", c.serve, subcmd.Params(
-			"bucket", subcmd.String, "", "Google Cloud Storage bucket name",
 			"sheet", subcmd.String, "", "ID of Google spreadsheet with title metadata",
 			"listen", subcmd.String, ":1549", "listen address",
 			"cert", subcmd.String, "", "path to cert file",
@@ -56,14 +79,9 @@ func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 
 func (c maincmd) serve(ctx context.Context, bucketName, sheetID, listenAddr, certFile, keyFile, username, password string, subdirs, verbose bool, _ []string) error {
 	return ctrlc.Run(ctx, func(ctx context.Context) error {
-		client, err := storage.NewClient(ctx, option.WithCredentialsFile(c.credsFile))
-		if err != nil {
-			return errors.Wrap(err, "creating GCS client")
-		}
-
 		s := &server{
-			bucket:      client.Bucket(bucketName),
-			credsFile:   c.credsFile,
+			ssvc:        c.ssvc,
+			bucket:      c.bucket,
 			sheetID:     sheetID,
 			dirTemplate: template.Must(template.New("").Parse(dirTemplate)),
 			username:    username,
@@ -72,9 +90,13 @@ func (c maincmd) serve(ctx context.Context, bucketName, sheetID, listenAddr, cer
 			verbose:     verbose,
 		}
 
+		http.Handle("/thumbs/", mid.Err(s.handleThumb))
 		http.Handle("/", mid.Err(s.handle))
 
 		log.Printf("Listening on %s", listenAddr)
+
+		var err error
+
 		if certFile != "" && keyFile != "" {
 			err = http.ListenAndServeTLS(listenAddr, certFile, keyFile, nil)
 		} else {
@@ -88,7 +110,7 @@ func (c maincmd) serve(ctx context.Context, bucketName, sheetID, listenAddr, cer
 }
 
 func (c maincmd) ssupdate(ctx context.Context, htmldir, sheetID string, _ []string) error {
-	return updateSpreadsheet(ctx, c.credsFile, htmldir, sheetID)
+	return updateSpreadsheet(ctx, c.ssvc, c.bucket, htmldir, sheetID)
 }
 
 func rootNamePrefix(rootName string) string {
@@ -120,6 +142,7 @@ type (
 		XMLName xml.Name `xml:"thumb"`
 		Aspect  string   `xml:"aspect,attr"`
 		Val     string   `xml:",chardata"`
+		origVal string
 	}
 
 	actor struct {
