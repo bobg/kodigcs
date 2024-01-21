@@ -65,21 +65,31 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 		return s.handleNFO(w, req, objname)
 	}
 
+	err = s.serveObj(ctx, w, req, objname, path, s.verbose)
+	return errors.Wrap(err, "serving object")
+}
+
+func (s *server) serveObj(ctx context.Context, w http.ResponseWriter, req *http.Request, objname, path string, verbose bool) error {
 	obj := s.bucket.Object(objname)
-	r, err := gcsobj.NewReader(ctx, obj)
+	attrs, err := obj.Attrs(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "creating reader for object %s", objname)
+		return errors.Wrapf(err, "getting attrs for object %s", objname)
 	}
+	objtime := attrs.Created
+	if attrs.Updated.After(objtime) {
+		objtime = attrs.Updated
+	}
+
+	r := gcsobj.NewReaderWithSize(ctx, obj, attrs.Size)
 	defer r.Close()
 
-	if s.verbose {
+	if verbose {
 		log.Printf("Serving %s", objname)
 
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		start := time.Now()
-
 		go func() {
 			t := time.NewTimer(time.Minute)
 			for {
@@ -95,7 +105,7 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 	}
 
 	wrapper := &mid.ResponseWrapper{W: w}
-	http.ServeContent(wrapper, req, path, time.Time{}, r)
+	http.ServeContent(wrapper, req, path, objtime, r)
 	if wrapper.Code < 200 || wrapper.Code >= 400 {
 		return mid.CodeErr{C: wrapper.Code}
 	}
@@ -135,17 +145,10 @@ func (s *server) handleThumb(w http.ResponseWriter, req *http.Request) error {
 	if s.objNames.Has(path) {
 		// Serve this thumb from the bucket.
 
-		obj := s.bucket.Object(path)
-		r, err := gcsobj.NewReader(ctx, obj)
-		if err != nil {
-			return errors.Wrapf(err, "creating reader for object %s", path)
-		}
-		defer r.Close()
-
 		log.Printf("Serving local thumb %s", path)
 
-		http.ServeContent(w, req, "/thumbs/"+path, time.Time{}, r)
-		return nil
+		err := s.serveObj(ctx, w, req, path, "/thumbs/"+path, false)
+		return errors.Wrap(err, "serving local thumb")
 	}
 
 	// Redirect to the thumb's actual URL.
