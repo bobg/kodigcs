@@ -214,7 +214,7 @@ func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir stri
 			return
 		}
 
-		if ext != ".iso" {
+		if false && ext != ".iso" {
 			return
 		}
 
