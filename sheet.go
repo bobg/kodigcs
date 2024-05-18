@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/pkg/errors"
+	"github.com/bobg/errors"
 	"golang.org/x/time/rate"
 	"google.golang.org/api/sheets/v4"
 )

@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bobg/errors"
 	"github.com/bobg/htree"
-	"github.com/pkg/errors"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )

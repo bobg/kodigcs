@@ -14,11 +14,11 @@ import (
 	"time"
 
 	"github.com/bobg/bib"
+	"github.com/bobg/errors"
 	"github.com/bobg/gcsobj"
 	"github.com/bobg/go-generics/v2/set"
 	"github.com/bobg/go-generics/v2/slices"
 	"github.com/bobg/mid"
-	"github.com/pkg/errors"
 	"google.golang.org/api/iterator"
 )
 

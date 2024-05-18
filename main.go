@@ -12,9 +12,9 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/bobg/ctrlc"
+	"github.com/bobg/errors"
 	"github.com/bobg/mid"
 	"github.com/bobg/subcmd"
-	"github.com/pkg/errors"
 	"golang.org/x/time/rate"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
