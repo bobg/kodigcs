@@ -69,7 +69,16 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 	return errors.Wrap(err, "serving object")
 }
 
-func (s *server) serveObj(ctx context.Context, w http.ResponseWriter, req *http.Request, objname, path string, verbose bool) error {
+func (s *server) serveObj(ctx context.Context, w http.ResponseWriter, req *http.Request, objname, path string, verbose bool) (err error) {
+	if verbose {
+		defer func() {
+			if err == nil {
+				return
+			}
+			log.Printf("Error serving %s: %s", objname, err)
+		}()
+	}
+
 	obj := s.bucket.Object(objname)
 	attrs, err := obj.Attrs(ctx)
 	if err != nil {
@@ -91,14 +100,17 @@ func (s *server) serveObj(ctx context.Context, w http.ResponseWriter, req *http.
 
 		start := time.Now()
 		go func() {
-			t := time.NewTimer(time.Minute)
+			ticker := time.NewTicker(time.Minute)
+			defer ticker.Stop()
+
 			for {
 				select {
 				case <-ctx.Done():
-					log.Printf("%s: served %d bytes in %s", objname, r.NRead(), time.Since(start))
-					break
-				case <-t.C:
-					log.Printf("%s: %d bytes [%s]", objname, r.NRead(), time.Since(start))
+					log.Printf("Finished serving %s: %d bytes in %s", objname, r.NRead(), time.Since(start))
+					return
+
+				case <-ticker.C:
+					log.Printf("Still serving %s: %d bytes in %s", objname, r.NRead(), time.Since(start))
 				}
 			}
 		}()
