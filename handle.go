@@ -26,6 +26,8 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 	if s.username != "" && s.password != "" {
 		username, password, ok := req.BasicAuth()
 		if !ok || username != s.username || password != s.password {
+			log.Printf("Unauthorized access attempt from %s (username %s, password %s, ok %v)", req.RemoteAddr, username, password, ok)
+
 			w.Header().Add("WWW-Authenticate", `Basic realm="Access to list and stream titles"`)
 			return mid.CodeErr{C: http.StatusUnauthorized}
 		}
