@@ -91,8 +91,16 @@ func (c maincmd) serve(ctx context.Context, sheetID, listenAddr, certFile, keyFi
 			verbose:     verbose,
 		}
 
-		http.Handle("/thumbs/", mid.Err(s.handleThumb))
-		http.Handle("/", mid.Err(s.handle))
+		thumb := mid.Err(s.handleThumb)
+		handle := mid.Err(s.handle)
+
+		if verbose {
+			thumb = mid.Log(thumb)
+			handle = mid.Log(handle)
+		}
+
+		http.Handle("/thumbs/", thumb)
+		http.Handle("/", handle)
 
 		log.Printf("Listening on %s", listenAddr)
 
