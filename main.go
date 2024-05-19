@@ -9,9 +9,10 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 
 	"cloud.google.com/go/storage"
-	"github.com/bobg/ctrlc"
 	"github.com/bobg/errors"
 	"github.com/bobg/mid"
 	"github.com/bobg/subcmd"
@@ -77,46 +78,58 @@ func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 	)
 }
 
-func (c maincmd) serve(ctx context.Context, sheetID, listenAddr, certFile, keyFile, username, password string, subdirs, verbose bool, _ []string) error {
-	return ctrlc.Run(ctx, func(ctx context.Context) error {
-		s := &server{
-			ssvc:        c.ssvc,
-			bucket:      c.bucket,
-			sheetID:     sheetID,
-			dirTemplate: template.Must(template.New("").Parse(dirTemplate)),
-			listenAddr:  listenAddr,
-			username:    username,
-			password:    password,
-			subdirs:     subdirs,
-			verbose:     verbose,
-		}
+func (c maincmd) serve(outerCtx context.Context, sheetID, listenAddr, certFile, keyFile, username, password string, subdirs, verbose bool, _ []string) error {
+	ctx, cancel := signal.NotifyContext(outerCtx, os.Interrupt)
+	defer cancel()
 
-		thumb := mid.Err(s.handleThumb)
-		handle := mid.Err(s.handle)
+	s := &server{
+		ssvc:        c.ssvc,
+		bucket:      c.bucket,
+		sheetID:     sheetID,
+		dirTemplate: template.Must(template.New("").Parse(dirTemplate)),
+		listenAddr:  listenAddr,
+		username:    username,
+		password:    password,
+		subdirs:     subdirs,
+		verbose:     verbose,
+	}
 
-		if verbose {
-			thumb = mid.Log(thumb)
-			handle = mid.Log(handle)
-		}
+	var (
+		mux    = http.NewServeMux()
+		thumb  = mid.Err(s.handleThumb)
+		handle = mid.Err(s.handle)
+	)
+	if verbose {
+		thumb = mid.Log(thumb)
+		handle = mid.Log(handle)
+	}
+	mux.Handle("/thumbs/", thumb)
+	mux.Handle("/", handle)
 
-		http.Handle("/thumbs/", thumb)
-		http.Handle("/", handle)
+	h := &http.Server{
+		Addr:    listenAddr,
+		Handler: mux,
+	}
 
-		log.Printf("Listening on %s", listenAddr)
+	go func() {
+		<-ctx.Done()
+		h.Shutdown(outerCtx)
+	}()
 
-		var err error
+	log.Printf("Listening on %s", listenAddr)
 
-		if certFile != "" && keyFile != "" {
-			s.tls = true
-			err = http.ListenAndServeTLS(listenAddr, certFile, keyFile, nil)
-		} else {
-			err = http.ListenAndServe(listenAddr, nil)
-		}
-		if errors.Is(err, http.ErrServerClosed) {
-			return nil
-		}
-		return errors.Wrap(err, "in ListenAndServe")
-	})
+	var err error
+
+	if certFile != "" && keyFile != "" {
+		s.tls = true
+		err = http.ListenAndServeTLS(listenAddr, certFile, keyFile, nil)
+	} else {
+		err = http.ListenAndServe(listenAddr, nil)
+	}
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return errors.Wrap(err, "in ListenAndServe")
 }
 
 func (c maincmd) ssupdate(ctx context.Context, htmldir, sheetID string, _ []string) error {
