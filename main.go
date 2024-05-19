@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 
 	"cloud.google.com/go/storage"
 	"github.com/bobg/errors"
@@ -79,7 +80,7 @@ func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 }
 
 func (c maincmd) serve(outerCtx context.Context, sheetID, listenAddr, certFile, keyFile, username, password string, subdirs, verbose bool, _ []string) error {
-	ctx, cancel := signal.NotifyContext(outerCtx, os.Interrupt)
+	ctx, cancel := signal.NotifyContext(outerCtx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	s := &server{
@@ -113,6 +114,7 @@ func (c maincmd) serve(outerCtx context.Context, sheetID, listenAddr, certFile, 
 
 	go func() {
 		<-ctx.Done()
+		log.Printf("Signal received, shutting down server")
 		h.Shutdown(outerCtx)
 	}()
 
@@ -122,9 +124,9 @@ func (c maincmd) serve(outerCtx context.Context, sheetID, listenAddr, certFile, 
 
 	if certFile != "" && keyFile != "" {
 		s.tls = true
-		err = http.ListenAndServeTLS(listenAddr, certFile, keyFile, nil)
+		err = h.ListenAndServeTLS(certFile, keyFile)
 	} else {
-		err = http.ListenAndServe(listenAddr, nil)
+		err = h.ListenAndServe()
 	}
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
