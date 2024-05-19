@@ -23,14 +23,8 @@ import (
 )
 
 func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
-	if s.username != "" && s.password != "" {
-		username, password, ok := req.BasicAuth()
-		if !ok || username != s.username || password != s.password {
-			log.Printf("Unauthorized access attempt from %s (username %s, password %s, ok %v)", req.RemoteAddr, username, password, ok)
-
-			w.Header().Add("WWW-Authenticate", `Basic realm="Access to list and stream titles"`)
-			return mid.CodeErr{C: http.StatusUnauthorized}
-		}
+	if err := s.checkAuth(w, req); err != nil {
+		return err
 	}
 
 	path := strings.Trim(req.URL.Path, "/")
@@ -69,6 +63,25 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 
 	err = s.serveObj(ctx, w, req, objname, path, s.verbose)
 	return errors.Wrap(err, "serving object")
+}
+
+func (s *server) checkAuth(w http.ResponseWriter, req *http.Request) error {
+	if s.username == "" || s.password == "" {
+		return nil
+	}
+
+	username, password, ok := req.BasicAuth()
+	if !ok {
+		w.Header().Add("WWW-Authenticate", `Basic realm="Access to list and stream titles"`)
+		return mid.CodeErr{C: http.StatusUnauthorized}
+	}
+
+	if username != s.username || password != s.password {
+		log.Printf("Unauthorized access attempt from %s (username %s, password %s)", req.RemoteAddr, username, password)
+		return mid.CodeErr{C: http.StatusUnauthorized}
+	}
+
+	return nil
 }
 
 func (s *server) serveObj(ctx context.Context, w http.ResponseWriter, req *http.Request, objname, path string, verbose bool) (err error) {
@@ -127,12 +140,8 @@ func (s *server) serveObj(ctx context.Context, w http.ResponseWriter, req *http.
 }
 
 func (s *server) handleThumb(w http.ResponseWriter, req *http.Request) error {
-	if s.username != "" && s.password != "" {
-		username, password, ok := req.BasicAuth()
-		if !ok || username != s.username || password != s.password {
-			w.Header().Add("WWW-Authenticate", `Basic realm="Access to list and stream titles"`)
-			return mid.CodeErr{C: http.StatusUnauthorized}
-		}
+	if err := s.checkAuth(w, req); err != nil {
+		return err
 	}
 
 	path := strings.Trim(req.URL.Path, "/")
