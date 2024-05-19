@@ -141,11 +141,7 @@ func (s *server) serveWithCert(ctx context.Context, cert *tls.Certificate) error
 	errCh := make(chan error, 1)
 	go func() {
 		log.Printf("Listening on %s", s.listenAddr)
-		if cert != nil {
-			errCh <- h.ListenAndServeTLS("", "")
-		} else {
-			errCh <- h.ListenAndServe()
-		}
+		errCh <- h.ListenAndServe()
 		close(errCh)
 	}()
 
