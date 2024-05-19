@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/sha256"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/xml"
 	"flag"
@@ -15,7 +14,6 @@ import (
 	"syscall"
 
 	"cloud.google.com/go/storage"
-	"github.com/bobg/certs"
 	"github.com/bobg/errors"
 	"github.com/bobg/mid"
 	"github.com/bobg/subcmd"
@@ -67,7 +65,8 @@ func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 		"serve", c.serve, subcmd.Params(
 			"sheet", subcmd.String, "", "ID of Google spreadsheet with title metadata",
 			"listen", subcmd.String, ":1549", "listen address",
-			"certcmd", subcmd.String, "", "command to produce a sequence of JSON-encoded TLS certificates",
+			"cert", subcmd.String, "", "path to cert file",
+			"key", subcmd.String, "", "path to key file",
 			"username", subcmd.String, "", "HTTP Basic Auth username",
 			"password", subcmd.String, "", "HTTP Basic Auth password", // TODO: move this to an env var so as not to reveal it via expvar
 			"subdirs", subcmd.Bool, true, "whether to serve subdirectories",
@@ -80,8 +79,8 @@ func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 	)
 }
 
-func (c maincmd) serve(ctx context.Context, sheetID, listenAddr, certcmd, username, password string, subdirs, verbose bool, _ []string) error {
-	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+func (c maincmd) serve(outerCtx context.Context, sheetID, listenAddr, certFile, keyFile, username, password string, subdirs, verbose bool, _ []string) error {
+	ctx, cancel := signal.NotifyContext(outerCtx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	s := &server{
@@ -96,34 +95,12 @@ func (c maincmd) serve(ctx context.Context, sheetID, listenAddr, certcmd, userna
 		verbose:     verbose,
 	}
 
-	return s.serveHelper(ctx, certcmd)
-}
-
-func (s *server) serveHelper(ctx context.Context, certcmd string) error {
-	if certcmd != "" {
-		certCh, wait, err := certs.FromCommand(ctx, certcmd)
-		if err != nil {
-			return errors.Wrap(err, "launching cert command")
-		}
-		defer wait()
-
-		for cert := range certCh {
-			if err := s.serveWithCert(ctx, &cert); err != nil {
-				return err
-			}
-		}
-	}
-
-	return s.serveWithCert(ctx, nil)
-}
-
-func (s *server) serveWithCert(ctx context.Context, cert *tls.Certificate) error {
 	var (
 		mux    = http.NewServeMux()
 		thumb  = mid.Err(s.handleThumb)
 		handle = mid.Err(s.handle)
 	)
-	if s.verbose {
+	if verbose {
 		thumb = mid.Log(thumb)
 		handle = mid.Log(handle)
 	}
@@ -131,40 +108,30 @@ func (s *server) serveWithCert(ctx context.Context, cert *tls.Certificate) error
 	mux.Handle("/", handle)
 
 	h := &http.Server{
-		Addr:    s.listenAddr,
+		Addr:    listenAddr,
 		Handler: mux,
 	}
-	if cert != nil {
-		h.TLSConfig = &tls.Config{Certificates: []tls.Certificate{*cert}}
-	}
 
-	errCh := make(chan error, 1)
 	go func() {
-		log.Printf("Listening on %s", s.listenAddr)
-		errCh <- h.ListenAndServe()
-		close(errCh)
+		<-ctx.Done()
+		log.Printf("Signal received, shutting down server")
+		h.Shutdown(outerCtx)
 	}()
 
-	ctxWithoutCancel := context.WithoutCancel(ctx)
+	log.Printf("Listening on %s", listenAddr)
 
-	select {
-	case <-ctx.Done():
-		log.Printf("Context canceled, shutting down server")
-		if err := h.Shutdown(ctxWithoutCancel); err != nil {
-			return errors.Wrap(err, "in Shutdown")
-		}
-		err := <-errCh
-		if errors.Is(err, http.ErrServerClosed) {
-			return nil
-		}
-		return errors.Wrap(err, "in ListenAndServe")
+	var err error
 
-	case err := <-errCh:
-		if errors.Is(err, http.ErrServerClosed) {
-			return nil
-		}
-		return errors.Wrap(err, "in ListenAndServe")
+	if certFile != "" && keyFile != "" {
+		s.tls = true
+		err = h.ListenAndServeTLS(certFile, keyFile)
+	} else {
+		err = h.ListenAndServe()
 	}
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return errors.Wrap(err, "in ListenAndServe")
 }
 
 func (c maincmd) ssupdate(ctx context.Context, htmldir, sheetID string, _ []string) error {

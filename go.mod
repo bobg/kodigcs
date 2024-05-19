@@ -5,7 +5,6 @@ go 1.21
 require (
 	cloud.google.com/go/storage v1.41.0
 	github.com/bobg/bib v0.1.2
-	github.com/bobg/certs v0.2.0
 	github.com/bobg/errors v1.1.0
 	github.com/bobg/gcsobj v0.2.0
 	github.com/bobg/go-generics/v2 v2.2.2
