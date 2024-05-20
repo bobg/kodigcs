@@ -85,14 +85,15 @@ func (c maincmd) serve(ctx context.Context, sheetID, listenAddr, certcmd, userna
 	defer cancel()
 
 	s := &server{
-		ssvc:        c.ssvc,
 		bucket:      c.bucket,
-		sheetID:     sheetID,
 		dirTemplate: template.Must(template.New("").Parse(dirTemplate)),
 		listenAddr:  listenAddr,
-		username:    username,
 		password:    password,
+		sheetID:     sheetID,
+		ssvc:        c.ssvc,
 		subdirs:     subdirs,
+		tls:         certcmd != "",
+		username:    username,
 		verbose:     verbose,
 	}
 
