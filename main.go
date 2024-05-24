@@ -101,7 +101,7 @@ func (c maincmd) serve(ctx context.Context, sheetID, listenAddr, certcmd, userna
 	return s.serveHelper(ctx, certcmd)
 }
 
-func (s *server) serveHelper(ctx context.Context, certcmd string) error {
+func (s *server) serveHelper(ctx context.Context, certcmd string) (err error) {
 	if certcmd == "" {
 		return s.serveWithCert(ctx, nil)
 	}
@@ -110,7 +110,10 @@ func (s *server) serveHelper(ctx context.Context, certcmd string) error {
 	if err != nil {
 		return errors.Wrap(err, "launching cert command")
 	}
-	defer wait()
+	defer func() {
+		err2 := wait()
+		err = errors.Join(err, err2)
+	}()
 
 	var (
 		cert tls.Certificate
