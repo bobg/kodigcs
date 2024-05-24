@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"flag"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -111,18 +112,25 @@ func (s *server) serveHelper(ctx context.Context, certcmd string) error {
 	}
 	defer wait()
 
-	var cert tls.Certificate
+	var (
+		cert tls.Certificate
+		ok   bool
+	)
 
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case cert = <-certCh:
+
+	case cert, ok = <-certCh:
+		if !ok {
+			return fmt.Errorf("cert command exited before producing a certificate")
+		}
 	}
 
 	for {
 		newCertPtr, err := s.serveHelper2(ctx, certCh, cert)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "serving with certificate")
 		}
 		cert = *newCertPtr
 	}
@@ -147,9 +155,13 @@ func (s *server) serveHelper2(outerCtx context.Context, certCh <-chan tls.Certif
 		if errors.Is(err, context.Canceled) && outerCtx.Err() == nil {
 			err = nil
 		}
-		return nil, err
+		return nil, errors.Wrap(err, "error from goroutine")
 
-	case newCert := <-certCh:
+	case newCert, ok := <-certCh:
+		if !ok {
+			return nil, fmt.Errorf("cert command exited")
+		}
+
 		cancel()
 
 		err := <-errCh
@@ -159,7 +171,7 @@ func (s *server) serveHelper2(outerCtx context.Context, certCh <-chan tls.Certif
 			}
 		}
 
-		return &newCert, err
+		return &newCert, errors.Wrap(err, "after canceling goroutine")
 	}
 }
 
