@@ -101,21 +101,66 @@ func (c maincmd) serve(ctx context.Context, sheetID, listenAddr, certcmd, userna
 }
 
 func (s *server) serveHelper(ctx context.Context, certcmd string) error {
-	if certcmd != "" {
-		certCh, wait, err := certs.FromCommand(ctx, certcmd)
-		if err != nil {
-			return errors.Wrap(err, "launching cert command")
-		}
-		defer wait()
-
-		for cert := range certCh {
-			if err := s.serveWithCert(ctx, &cert); err != nil {
-				return err
-			}
-		}
+	if certcmd == "" {
+		return s.serveWithCert(ctx, nil)
 	}
 
-	return s.serveWithCert(ctx, nil)
+	certCh, wait, err := certs.FromCommand(ctx, certcmd)
+	if err != nil {
+		return errors.Wrap(err, "launching cert command")
+	}
+	defer wait()
+
+	var cert tls.Certificate
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case cert = <-certCh:
+	}
+
+	for {
+		newCertPtr, err := s.serveHelper2(ctx, certCh, cert)
+		if err != nil {
+			return err
+		}
+		cert = *newCertPtr
+	}
+}
+
+func (s *server) serveHelper2(outerCtx context.Context, certCh <-chan tls.Certificate, cert tls.Certificate) (*tls.Certificate, error) {
+	ctx, cancel := context.WithCancel(outerCtx)
+	defer cancel()
+
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- s.serveWithCert(ctx, &cert)
+		close(errCh)
+	}()
+
+	select {
+	case <-outerCtx.Done():
+		return nil, outerCtx.Err()
+
+	case err := <-errCh: // TODO: can err be nil here?
+		if errors.Is(err, context.Canceled) && outerCtx.Err() == nil {
+			err = nil
+		}
+		return nil, err
+
+	case newCert := <-certCh:
+		cancel()
+
+		err := <-errCh
+		if err != nil {
+			if errors.Is(err, context.Canceled) && outerCtx.Err() == nil {
+				err = nil
+			}
+		}
+
+		return &newCert, err
+	}
 }
 
 func (s *server) serveWithCert(ctx context.Context, cert *tls.Certificate) error {
