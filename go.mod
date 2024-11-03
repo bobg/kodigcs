@@ -1,6 +1,8 @@
 module github.com/bobg/kodigcs
 
-go 1.21
+go 1.22
+
+toolchain go1.22.2
 
 require (
 	cloud.google.com/go/storage v1.41.0
@@ -8,10 +10,10 @@ require (
 	github.com/bobg/certs v0.3.3
 	github.com/bobg/errors v1.1.0
 	github.com/bobg/gcsobj v0.2.0
-	github.com/bobg/go-generics/v2 v2.2.2
+	github.com/bobg/go-generics/v3 v3.5.0
 	github.com/bobg/htree v1.3.1
 	github.com/bobg/mid v1.7.1
-	github.com/bobg/subcmd v1.0.4
+	github.com/bobg/subcmd/v2 v2.2.2
 	golang.org/x/net v0.25.0
 	golang.org/x/time v0.5.0
 	google.golang.org/api v0.181.0
@@ -23,6 +25,7 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	cloud.google.com/go/iam v1.1.8 // indirect
+	github.com/bobg/go-generics/v2 v2.2.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

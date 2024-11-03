@@ -16,8 +16,8 @@ import (
 	"github.com/bobg/bib"
 	"github.com/bobg/errors"
 	"github.com/bobg/gcsobj"
-	"github.com/bobg/go-generics/v2/set"
-	"github.com/bobg/go-generics/v2/slices"
+	"github.com/bobg/go-generics/v3/set"
+	"github.com/bobg/go-generics/v3/slices"
 	"github.com/bobg/mid"
 	"google.golang.org/api/iterator"
 )
