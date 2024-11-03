@@ -65,7 +65,7 @@ type maincmd struct {
 
 func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 	return subcmd.Commands(
-		"serve", c.serve, subcmd.Params(
+		"serve", c.serve, "run the server", subcmd.Params(
 			"-sheet", subcmd.String, "", "ID of Google spreadsheet with title metadata",
 			"-listen", subcmd.String, ":1549", "listen address",
 			"-certcmd", subcmd.String, "", "command to produce a sequence of JSON-encoded TLS certificates",
@@ -74,7 +74,7 @@ func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 			"-subdirs", subcmd.Bool, true, "whether to serve subdirectories",
 			"-verbose", subcmd.Bool, false, "log each chunk of content as it's served",
 		),
-		"ssupdate", c.ssupdate, subcmd.Params(
+		"ssupdate", c.ssupdate, "update the metadata spreadsheet", subcmd.Params(
 			"-htmldir", subcmd.String, "", "directory of IMDb *.iso.html files",
 			"-sheet", subcmd.String, "", "ID of Google spreadsheet with title metadata",
 		),
