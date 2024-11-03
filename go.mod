@@ -10,7 +10,7 @@ require (
 	github.com/bobg/certs v0.3.3
 	github.com/bobg/errors v1.1.0
 	github.com/bobg/gcsobj v0.2.0
-	github.com/bobg/go-generics/v3 v3.5.0
+	github.com/bobg/go-generics/v4 v4.1.1
 	github.com/bobg/htree/v2 v2.0.0
 	github.com/bobg/mid v1.7.1
 	github.com/bobg/subcmd/v2 v2.2.2
@@ -35,6 +35,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.4 // indirect
+	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.51.0 // indirect

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/bobg/go-generics/v3/set"
+	"github.com/bobg/go-generics/v4/set"
 	"google.golang.org/api/sheets/v4"
 )
 
