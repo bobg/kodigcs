@@ -19,7 +19,7 @@ import (
 	"github.com/bobg/certs"
 	"github.com/bobg/errors"
 	"github.com/bobg/mid"
-	"github.com/bobg/subcmd"
+	"github.com/bobg/subcmd/v2"
 	"golang.org/x/time/rate"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
@@ -66,17 +66,17 @@ type maincmd struct {
 func (c maincmd) Subcmds() map[string]subcmd.Subcmd {
 	return subcmd.Commands(
 		"serve", c.serve, subcmd.Params(
-			"sheet", subcmd.String, "", "ID of Google spreadsheet with title metadata",
-			"listen", subcmd.String, ":1549", "listen address",
-			"certcmd", subcmd.String, "", "command to produce a sequence of JSON-encoded TLS certificates",
-			"username", subcmd.String, "", "HTTP Basic Auth username",
-			"password", subcmd.String, "", "HTTP Basic Auth password", // TODO: move this to an env var so as not to reveal it via expvar
-			"subdirs", subcmd.Bool, true, "whether to serve subdirectories",
-			"verbose", subcmd.Bool, false, "log each chunk of content as it's served",
+			"-sheet", subcmd.String, "", "ID of Google spreadsheet with title metadata",
+			"-listen", subcmd.String, ":1549", "listen address",
+			"-certcmd", subcmd.String, "", "command to produce a sequence of JSON-encoded TLS certificates",
+			"-username", subcmd.String, "", "HTTP Basic Auth username",
+			"-password", subcmd.String, "", "HTTP Basic Auth password", // TODO: move this to an env var so as not to reveal it via expvar
+			"-subdirs", subcmd.Bool, true, "whether to serve subdirectories",
+			"-verbose", subcmd.Bool, false, "log each chunk of content as it's served",
 		),
 		"ssupdate", c.ssupdate, subcmd.Params(
-			"htmldir", subcmd.String, "", "directory of IMDb *.iso.html files",
-			"sheet", subcmd.String, "", "ID of Google spreadsheet with title metadata",
+			"-htmldir", subcmd.String, "", "directory of IMDb *.iso.html files",
+			"-sheet", subcmd.String, "", "ID of Google spreadsheet with title metadata",
 		),
 	)
 }
