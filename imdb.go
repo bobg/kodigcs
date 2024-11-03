@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/bobg/errors"
-	"github.com/bobg/htree"
+	"github.com/bobg/htree/v2"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )
