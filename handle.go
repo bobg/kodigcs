@@ -231,7 +231,7 @@ func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir stri
 	s.objNames.Each(func(objName string) {
 		ext := filepath.Ext(objName)
 		switch ext {
-		case ".iso", ".m2ts", ".m4v", ".mp4":
+		case ".iso", ".m2ts", ".m4v", ".mp4", ".webm":
 			// ok
 		default:
 			return
