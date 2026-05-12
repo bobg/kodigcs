@@ -285,7 +285,7 @@ type limitedTransport struct {
 func (lt *limitedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	err := lt.limiter.Wait(req.Context())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "in rate limiter")
 	}
 	return lt.transport.RoundTrip(req)
 }

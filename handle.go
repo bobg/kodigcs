@@ -24,7 +24,7 @@ import (
 
 func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 	if err := s.checkAuth(w, req); err != nil {
-		return err
+		return errors.Wrap(err, "in auth check")
 	}
 
 	path := strings.Trim(req.URL.Path, "/")
@@ -35,8 +35,7 @@ func (s *server) handle(w http.ResponseWriter, req *http.Request) error {
 	ctx := req.Context()
 
 	if path == "infomap" {
-		err := s.ensureInfoMap(ctx)
-		if err != nil {
+		if err := s.ensureInfoMap(); err != nil {
 			return errors.Wrap(err, "getting info map")
 		}
 
@@ -141,7 +140,7 @@ func (s *server) serveObj(ctx context.Context, w http.ResponseWriter, req *http.
 
 func (s *server) handleThumb(w http.ResponseWriter, req *http.Request) error {
 	if err := s.checkAuth(w, req); err != nil {
-		return err
+		return errors.Wrap(err, "in auth check")
 	}
 
 	path := strings.Trim(req.URL.Path, "/")
@@ -158,7 +157,7 @@ func (s *server) handleThumb(w http.ResponseWriter, req *http.Request) error {
 		return errors.Wrap(err, "getting obj names")
 	}
 
-	if err := s.ensureInfoMap(ctx); err != nil {
+	if err := s.ensureInfoMap(); err != nil {
 		return errors.Wrap(err, "in ensureInfoMap")
 	}
 
@@ -219,8 +218,7 @@ func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir stri
 		return errors.Wrap(err, "getting obj names")
 	}
 
-	err = s.ensureInfoMap(ctx)
-	if err != nil {
+	if err := s.ensureInfoMap(); err != nil {
 		return errors.Wrap(err, "getting info map")
 	}
 
@@ -275,9 +273,7 @@ func (s *server) handleDir(w http.ResponseWriter, req *http.Request, subdir stri
 }
 
 func (s *server) handleNFO(w http.ResponseWriter, req *http.Request, path string) error {
-	ctx := req.Context()
-	err := s.ensureInfoMap(ctx)
-	if err != nil {
+	if err := s.ensureInfoMap(); err != nil {
 		return errors.Wrap(err, "getting info map")
 	}
 
@@ -296,8 +292,7 @@ func (s *server) handleNFO(w http.ResponseWriter, req *http.Request, path string
 	w.Write([]byte(xml.Header))
 	enc := xml.NewEncoder(w)
 	enc.Indent("", "  ")
-	err = enc.Encode(info)
-	if err != nil {
+	if err := enc.Encode(info); err != nil {
 		return errors.Wrap(err, "writing XML")
 	}
 
@@ -308,9 +303,8 @@ func (s *server) handleNFO(w http.ResponseWriter, req *http.Request, path string
 }
 
 func (s *server) parsePath(ctx context.Context, path string) (subdir, objname string, err error) {
-	err = s.ensureInfoMap(ctx)
-	if err != nil {
-		return "", "", err
+	if err := s.ensureInfoMap(); err != nil {
+		return "", "", errors.Wrap(err, "getting info map")
 	}
 
 	ext := filepath.Ext(path)
@@ -362,7 +356,7 @@ func (s *server) ensureObjNames(ctx context.Context) error {
 	return nil
 }
 
-func (s *server) ensureInfoMap(ctx context.Context) error {
+func (s *server) ensureInfoMap() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
