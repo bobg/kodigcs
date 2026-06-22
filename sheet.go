@@ -20,7 +20,7 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
-func handleSheet(sheetsSvc *sheets.SpreadsheetsService, sheetID string, f func(rownum int, headings []string, name string, row []interface{}) error) error {
+func handleSheet(sheetsSvc *sheets.SpreadsheetsService, sheetID string, f func(rownum int, headings []string, name string, row []any) error) error {
 	resp, err := sheetsSvc.Values.Get(sheetID, "Sheet1!A:Z").Do()
 	if err != nil {
 		return errors.Wrap(err, "reading spreadsheet data")
@@ -77,13 +77,13 @@ func updateSpreadsheet(ctx context.Context, ssvc *sheets.SpreadsheetsService, bu
 		}
 		vr := &sheets.ValueRange{
 			Range:  cell,
-			Values: [][]interface{}{{val}},
+			Values: [][]any{{val}},
 		}
 		_, err := ssvc.Values.Update(sheetID, cell, vr).Context(ctx).ValueInputOption("RAW").Do()
 		return errors.Wrap(err, "updating cell %s in spreadsheet")
 	}
 
-	return handleSheet(ssvc, sheetID, func(rownum int, headings []string, name string, row []interface{}) error {
+	return handleSheet(ssvc, sheetID, func(rownum int, headings []string, name string, row []any) error {
 		var needLookup bool
 		for j, heading := range headings {
 			switch heading {

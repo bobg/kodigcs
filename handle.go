@@ -371,7 +371,7 @@ func (s *server) ensureInfoMap() error {
 
 	s.infoMap = make(map[string]movieInfo)
 
-	err := handleSheet(s.ssvc, s.sheetID, func(_ int, headings []string, name string, row []interface{}) error {
+	err := handleSheet(s.ssvc, s.sheetID, func(_ int, headings []string, name string, row []any) error {
 		var info movieInfo
 
 		var (
